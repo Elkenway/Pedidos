@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Castano Living</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">CL</div>
+    <div>
+      <div class="nav-title">Castano Living</div>
+      <div class="nav-subtitle">Indoor · Outdoor Furniture</div>
+    </div>
+  </div>
+  <div class="nav-user" id="nav-user">
+    <div class="nav-links">
+      <button class="btn-nav" id="btn-go-store">Tienda</button>
+      <button class="btn-nav btn-nav-admin" id="btn-go-admin">Admin</button>
+    </div>
+    Hola, <span id="nav-username"></span>
+    <button class="btn-logout" id="btn-logout">Salir</button>
+  </div>
+</nav>
+
+<!-- ══ LOGIN ══ -->
+<div id="login-page" class="page active">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="logo-big">CL</div>
+      <h1>Castano Living</h1>
+      <p>Accede a tu cuenta</p>
+    </div>
+    <div class="form-group">
+      <label>Usuario</label>
+      <input type="text" id="login-user" placeholder="nombre de usuario" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-primary" id="btn-login">Ingresar</button>
+    <div id="login-error" class="msg-error"></div>
+  </div>
+</div>
+
+<!-- ══ TIENDA ══ -->
+<div id="store-page" class="page">
+  <div class="store-hero">
+    <h1>Nuestra Colección</h1>
+    <p>Selecciona los productos y finaliza tu pedido</p>
+  </div>
+  <div class="store-layout">
+    <div class="store-left">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-bar" placeholder="Buscar producto...">
+      </div>
+      <div class="products-grid" id="products-grid">
+        <div class="loading-products">Cargando productos...</div>
+      </div>
+    </div>
+    <div class="cart-panel">
+      <div class="cart-title">
+        Carrito
+        <div class="cart-badge" id="cart-count">0</div>
+      </div>
+      <div class="cart-items" id="cart-items">
+        <p class="cart-empty">Tu carrito está vacío</p>
+      </div>
+      <div class="cart-total">
+        <span class="cart-total-label">Total</span>
+        <span class="cart-total-value"><span>$</span><span id="cart-total">0</span></span>
+      </div>
+      <button class="btn-checkout" id="btn-checkout" disabled>
+        Proceder al pago →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGO ══ -->
+<div id="payment-page" class="page">
+  <div class="payment-hero">
+    <button class="back-btn" id="btn-back-store">← Volver a la tienda</button>
+    <h1>Pago Seguro</h1>
+    <p>Ingresa los datos de tu tarjeta</p>
+  </div>
+  <div class="payment-layout">
+    <div>
+      <div class="card-visual">
+        <div class="card-chip"></div>
+        <div class="card-number-display" id="card-display">•••• •••• •••• ••••</div>
+        <div class="card-bottom">
+          <div>
+            <div class="card-label">Titular</div>
+            <div class="card-value" id="card-holder-display">NOMBRE TITULAR</div>
+          </div>
+          <div>
+            <div class="card-label">Vence</div>
+            <div class="card-value" id="card-exp-display">MM/AA</div>
+          </div>
+          <div class="card-network">
+            <div class="card-circle cc1"></div>
+            <div class="card-circle cc2"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="payment-form-card">
+        <h2>Datos de la tarjeta</h2>
+        <div class="field-group">
+          <label>Nombre del titular</label>
+          <div class="field-wrapper">
+            <input type="text" id="p-holder" placeholder="Nombre completo">
+          </div>
+        </div>
+        <div class="field-group">
+          <label>Número de tarjeta</label>
+          <div class="field-wrapper">
+            <input type="text" id="p-number" placeholder="0000 0000 0000 0000" maxlength="19">
+            <span class="field-icon" id="icon-number"></span>
+          </div>
+          <div class="field-help" id="help-number"></div>
+        </div>
+        <div class="form-row">
+          <div class="field-group">
+            <label>Vencimiento (MM/AA)</label>
+            <div class="field-wrapper">
+              <input type="text" id="p-exp" placeholder="MM/AA" maxlength="5">
+              <span class="field-icon" id="icon-exp"></span>
+            </div>
+            <div class="field-help" id="help-exp"></div>
+          </div>
+          <div class="field-group">
+            <label>CVV</label>
+            <div class="field-wrapper">
+              <input type="text" id="p-cvv" placeholder="000" maxlength="3">
+              <span class="field-icon" id="icon-cvv"></span>
+            </div>
+            <div class="field-help" id="help-cvv"></div>
+          </div>
+        </div>
+        <div class="demo-cards">
+          <div class="demo-cards-title">Tarjetas de prueba — click para autocompletar</div>
+          <div id="demo-cards-list"><div class="loading-products">Cargando...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="order-summary-card">
+      <h2>Resumen del pedido</h2>
+      <div id="summary-items"></div>
+      <div class="summary-total">
+        <span class="summary-total-label">Total</span>
+        <span class="summary-total-val">$<span id="summary-total">0</span></span>
+      </div>
+      <button class="btn-pay" id="btn-pay">Pagar ahora</button>
+      <div class="secure-note">🔒 Transacción simulada</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ÉXITO ══ -->
+<div id="success-page" class="page">
+  <div class="success-wrap">
+    <div class="success-card">
+      <div class="success-icon">✓</div>
+      <h2>¡Pago exitoso!</h2>
+      <p>Tu pedido ha sido procesado correctamente.</p>
+      <div class="success-order">
+        <div class="order-label">Número de pedido</div>
+        <div class="order-num" id="success-order-num">#000000</div>
+      </div>
+      <div class="success-detail" id="success-detail"></div>
+      <button class="btn-new-order" id="btn-new-order">Realizar otro pedido</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN ══ -->
+<div id="admin-page" class="page">
+  <div class="admin-hero">
+    <button class="back-btn" id="btn-back-store-admin">← Volver a tienda</button>
+    <h1>Panel de Administración</h1>
+    <p>Gestiona precios, stock y disponibilidad</p>
+  </div>
+  <div class="admin-layout">
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <h2>Productos</h2>
+        <span class="admin-hint">Edita los campos y presiona Guardar en cada fila</span>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Precio (USD)</th>
+              <th>Stock</th>
+              <th>Disponible</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="admin-tbody">
+            <tr><td colspan="5" class="loading-products">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
