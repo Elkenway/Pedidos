@@ -1,63 +1,75 @@
-# Castano Living — Estado del proyecto (hoy)
+# Castano Living — Estado del proyecto
 
-## Arrancar el proyecto
+## Orden para actualizar tu BD existente
+
+1. pgAdmin → Query Tool sobre `castano_living` → ejecuta, en este orden:
+   - `arreglos.sql` (si aún no lo habías corrido — dedup + restricciones únicas)
+   - `pedidos.sql` (si aún no lo habías corrido — crea tablas de pedidos)
+   - `metodo_pago.sql` (nuevo — agrega método de pago a los pedidos)
+2. Reemplaza en tu carpeta del proyecto:
+   - `server.js`
+   - `public/index.html`
+   - `public/js/app.js`
+   - `public/css/main.css`
+3. Reinicia el servidor:
 ```cmd
 cd C:\Users\theal\Documents\Universidad\doo2026\castano-living
 node server.js
 ```
-Abrir en: http://localhost:3000
+
+## Qué cambió en esta entrega
+
+**Se eliminó por completo la simulación de pago con tarjeta.** Ya no hay
+formulario de tarjeta, validación Luhn, ni tarjetas de prueba — el pago
+ahora ocurre por fuera del sistema (datáfono, efectivo o transferencia).
+El vendedor solo marca cómo pagó el cliente y, si fue transferencia,
+puede anotar un número de referencia opcional.
+
+La tabla `pagos_tarjeta_credito` ya no se usa. Si quieres eliminarla:
+```sql
+DROP TABLE pagos_tarjeta_credito;
+```
+
+**Nueva sección "Ventas" (solo admin).** Muestra cada pedido registrado
+— lo haya vendido el vendedor o el propio admin, ambos caen en la misma
+lista automáticamente porque ambos quedan guardados en `pedidos` con
+quién lo procesó. Cada tarjeta de venta muestra: número de pedido,
+fecha, quién la hizo, método de pago, datos de entrega del cliente,
+los productos vendidos y el total. Arriba se ve un resumen con el
+número total de ventas y el monto acumulado.
 
 ## Credenciales
-| Usuario   | Contraseña |
-|-----------|-----------|
-| elkenway  | 1459      |
-| argiro    | 1961      |
+| Usuario   | Contraseña | Rol      |
+|-----------|-----------|----------|
+| elkenway  | 1459      | admin    |
+| argiro    | 1961      | vendedor |
 
-## Tarjetas de prueba
-| Titular          | Número               | Exp   | CVV | Saldo    |
-|------------------|----------------------|-------|-----|----------|
-| Elkenway Castano | 4532 0151 1283 0366  | 09/28 | 472 | $50.000  |
-| Argiro Castano   | 5425 2334 3010 9903  | 11/27 | 815 | $30.000  |
-| Carlos Mendoza   | 4916 3385 0608 2832  | 03/27 | 263 | $15.000  |
-| Laura Jiménez    | 4539 5787 6362 1486  | 07/26 | 934 | $25.000  |
-| Sin fondos       | 4111 1111 1111 1111  | 06/27 | 123 | $50      |
+## Rutas API
+| Método | Ruta               | Quién     | Descripción                              |
+|--------|--------------------| ----------|-------------------------------------------|
+| POST   | /api/login         | Todos     | Login, devuelve el rol                    |
+| GET    | /api/productos     | Todos     | Lista productos                           |
+| POST   | /api/productos     | Admin     | Agrega producto nuevo                     |
+| PUT    | /api/productos/:id | Admin     | Modifica nombre/precio/stock/estado       |
+| DELETE | /api/productos/:id | Admin     | Elimina producto                          |
+| POST   | /api/ventas        | Todos     | Registra la venta (valida y descuenta stock) |
+| GET    | /api/ventas        | Admin     | Lista todas las ventas con sus items      |
 
-## Estructura
-```
-castano-living/
-├── server.js              ← Node.js + Express + rutas API
-├── package.json
-├── castano_living.sql     ← Tablas + datos de prueba
-├── README.md
-└── public/
-    ├── index.html         ← SPA: Login / Tienda / Pago / Éxito
-    ├── css/
-    │   └── main.css
-    └── js/
-        └── app.js
-```
+## Nota importante sobre seguridad
 
-## Rutas API disponibles
-| Método | Ruta           | Descripción                        |
-|--------|----------------|------------------------------------|
-| POST   | /api/login     | Autenticación de usuario           |
-| GET    | /api/productos | Lista productos desde la BD        |
-| GET    | /api/tarjetas  | Lista tarjetas de prueba desde BD  |
-| POST   | /api/pago      | Procesa el pago y descuenta saldo  |
+Ahora mismo cualquiera que conozca las rutas `/api/productos` (POST/PUT/DELETE)
+o `/api/ventas` (GET) podría llamarlas directamente sin pasar por el login,
+porque el servidor todavía no valida el rol en cada petición — solo el
+frontend oculta los botones según el rol. Para una versión que se vaya a
+usar con datos reales de la empresa, esto hay que cerrarlo (sesiones o
+tokens). Por ahora, para la entrega académica y las pruebas internas, no
+es bloqueante.
 
-## Lo que viene (pendiente)
-- Barra de búsqueda
-- Productos iguales se suman en el carrito
-- Pedidos personalizados
-- Impresión de recibo (PDF)
-- Stock se descuenta al pagar
-- Manejo de excepciones robusto
-- Logs de actividad
-- Transacciones SQL con ROLLBACK
-- Mappers / Adapters / Patrón MVC
-- Clases con constructores, getters y setters
-- ESLint (análisis estático)
-- Git con ramas (main / develop / feature-x)
-- Sistema de pagos real (Wompi / PayU)
-- Comunicación almacén ↔ bodega (WebSockets)
-- Subir a la nube (Railway / Render)
+## Pendiente
+- Pedidos personalizados / encargos por Instagram
+- Asociar sillas específicas a cada mesa
+- Imprimir pedido y recibo de caja (PDF)
+- Pagos parciales con adelanto
+- Rol de bodega + comunicación en tiempo real
+- Validar rol del usuario en el servidor (ver nota de seguridad arriba)
+- ESLint, Git con ramas, mappers/adapters

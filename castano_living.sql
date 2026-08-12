@@ -1,36 +1,34 @@
 -- ============================================
---  CASTANO LIVING | Base de datos completa
---  1. Abrir pgAdmin, servidor "tienda"
---  2. Crear BD: castano_living
---  3. Query Tool sobre castano_living → F5
+--  CASTANO LIVING | castano_living.sql
+--  Script BASE para instalar desde cero.
+--  Si ya tienes la BD funcionando, NO reejecutes
+--  este archivo: usa arreglos.sql + pedidos.sql.
 -- ============================================
 
--- USUARIOS
 CREATE TABLE IF NOT EXISTS usuarios (
     id             SERIAL PRIMARY KEY,
     nombre         VARCHAR(100) NOT NULL,
     nombre_usuario VARCHAR(50)  NOT NULL UNIQUE,
     contrasena     VARCHAR(100) NOT NULL,
+    rol            VARCHAR(20)  DEFAULT 'vendedor',
     creado_en      TIMESTAMP DEFAULT NOW()
 );
 
-INSERT INTO usuarios (nombre, nombre_usuario, contrasena) VALUES
-('Administrador', 'elkenway', '1459'),
-('Argiro',        'argiro',   '1961')
+INSERT INTO usuarios (nombre, nombre_usuario, contrasena, rol) VALUES
+('Administrador', 'elkenway', '1459', 'admin'),
+('Argiro',        'argiro',   '1961', 'vendedor')
 ON CONFLICT (nombre_usuario) DO NOTHING;
 
 
--- PRODUCTOS
 CREATE TABLE IF NOT EXISTS productos (
     id         SERIAL PRIMARY KEY,
-    nombre     VARCHAR(100)  NOT NULL,
+    nombre     VARCHAR(100)  NOT NULL UNIQUE,
     precio     NUMERIC(10,2) NOT NULL,
     disponible BOOLEAN       DEFAULT TRUE,
     cantidad   INTEGER       DEFAULT 0
 );
 
 INSERT INTO productos (nombre, precio, disponible, cantidad) VALUES
--- Sillas (10)
 ('Silla Venecia',             180.00, TRUE, 10),
 ('Silla Roma',                210.00, TRUE, 10),
 ('Silla Toscana',             195.00, TRUE, 10),
@@ -41,7 +39,6 @@ INSERT INTO productos (nombre, precio, disponible, cantidad) VALUES
 ('Silla Sevilla',             215.00, TRUE, 10),
 ('Silla Córdoba',             190.00, TRUE, 10),
 ('Silla Granada',             205.00, TRUE, 10),
--- Comedores (10)
 ('Comedor 4 puestos Roble',   1200.00, TRUE, 10),
 ('Comedor 6 puestos Cedro',   1550.00, TRUE, 10),
 ('Comedor 8 puestos Nogal',   1900.00, TRUE, 10),
@@ -52,7 +49,6 @@ INSERT INTO productos (nombre, precio, disponible, cantidad) VALUES
 ('Comedor 6 puestos Bambú',   1450.00, TRUE, 10),
 ('Comedor 8 puestos Merbau',  2250.00, TRUE, 10),
 ('Comedor 10 puestos Cerezo', 2800.00, TRUE, 10),
--- Mesas (10)
 ('Mesa de trabajo Roble',     450.00, TRUE, 10),
 ('Mesa auxiliar Nogal',       280.00, TRUE, 10),
 ('Mesa esquinera Pino',       320.00, TRUE, 10),
@@ -63,7 +59,6 @@ INSERT INTO productos (nombre, precio, disponible, cantidad) VALUES
 ('Mesa alta bar Roble',       520.00, TRUE, 10),
 ('Mesa redonda Caoba',        600.00, TRUE, 10),
 ('Mesa rectangular Merbau',   570.00, TRUE, 10),
--- Mesas de centro (10)
 ('Mesa de centro Venecia',    350.00, TRUE, 10),
 ('Mesa de centro Oslo',       420.00, TRUE, 10),
 ('Mesa de centro Tokio',      390.00, TRUE, 10),
@@ -74,14 +69,13 @@ INSERT INTO productos (nombre, precio, disponible, cantidad) VALUES
 ('Mesa de centro Lisboa',     440.00, TRUE, 10),
 ('Mesa de centro Viena',      395.00, TRUE, 10),
 ('Mesa de centro Praga',      365.00, TRUE, 10)
-ON CONFLICT DO NOTHING;
+ON CONFLICT (nombre) DO NOTHING;
 
 
--- TARJETAS
 CREATE TABLE IF NOT EXISTS pagos_tarjeta_credito (
     id                  SERIAL PRIMARY KEY,
     nombre_titular      VARCHAR(100)  NOT NULL,
-    numero_tarjeta      VARCHAR(16)   NOT NULL,
+    numero_tarjeta      VARCHAR(16)   NOT NULL UNIQUE,
     fecha_vencimiento   VARCHAR(5)    NOT NULL,
     codigo_seguridad    VARCHAR(3)    NOT NULL,
     cantidad_disponible NUMERIC(12,2) DEFAULT 0
@@ -93,4 +87,6 @@ INSERT INTO pagos_tarjeta_credito (nombre_titular, numero_tarjeta, fecha_vencimi
 ('Carlos Mendoza',   '4916338506082832', '03/27', '263', 15000.00),
 ('Laura Jiménez',    '4539578763621486', '07/26', '934', 25000.00),
 ('Sin fondos',       '4111111111111111', '06/27', '123',    50.00)
-ON CONFLICT DO NOTHING;
+ON CONFLICT (numero_tarjeta) DO NOTHING;
+
+-- Despues de este script, ejecutar tambien pedidos.sql
