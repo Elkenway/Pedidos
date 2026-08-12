@@ -1,53 +1,69 @@
 /* ============================================
    CASTANO LIVING | app.js
-   v3.1 — Sesión persistente, refresh admin,
-           carrito agrupado, búsqueda, roles
+   Sin tarjeta simulada. El pago se registra
+   (efectivo / datafono / transferencia), no se
+   procesa. Incluye panel de Ventas para admin.
    ============================================ */
 
 let currentUser = null;
 let cart = [];
 
-// ── Utilidades ──
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id + '-page').classList.add('active');
 }
 function fmtPrice(n) { return Number(n).toLocaleString('es-CO'); }
-function maskCard(num) { return '**** **** **** ' + num.slice(-4); }
 
 function getIcon(nombre) {
   const n = nombre.toLowerCase();
   if (n.includes('silla'))          return '🪑';
   if (n.includes('comedor'))        return '🍽️';
   if (n.includes('mesa de centro')) return '☕';
-  if (n.includes('mesa de jardín')) return '🌿';
+  if (n.includes('jard'))           return '🌿';
   if (n.includes('mesa alta'))      return '🍺';
   if (n.includes('mesa'))           return '🪵';
   if (n.includes('cama'))           return '🛏️';
   if (n.includes('sofacama'))       return '🛌';
-  if (n.includes('sofá'))           return '🛋️';
+  if (n.includes('sof'))            return '🛋️';
   if (n.includes('esquinero'))      return '🪞';
   if (n.includes('accesorio'))      return '🖼️';
   return '📦';
 }
 
+function showMsg(elementId, msg, type = 'error') {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'payment-msg ' + type;
+  el.style.display = 'block';
+  if (type === 'success') setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+function hideMsg(elementId) {
+  const el = document.getElementById(elementId);
+  if (el) el.style.display = 'none';
+}
+
 // ── NAV ──
 document.getElementById('btn-logout').addEventListener('click', logout);
-
 document.getElementById('btn-go-store').addEventListener('click', async () => {
   await loadProducts();
   showPage('store');
 });
-
 document.getElementById('btn-go-admin').addEventListener('click', () => {
   loadAdminProducts();
   showPage('admin');
+});
+document.getElementById('btn-go-ventas').addEventListener('click', () => {
+  loadVentas();
+  showPage('ventas');
 });
 
 function setNavUser(name, rol) {
   document.getElementById('nav-username').textContent = name;
   document.getElementById('nav-user').style.display = 'flex';
-  document.getElementById('btn-go-admin').style.display = (rol === 'admin') ? 'inline-block' : 'none';
+  const adminOnly = (rol === 'admin') ? 'inline-block' : 'none';
+  document.getElementById('btn-go-admin').style.display  = adminOnly;
+  document.getElementById('btn-go-ventas').style.display = adminOnly;
 }
 
 function logout() {
@@ -62,7 +78,7 @@ function logout() {
 }
 
 // ════════════════════════════════════════════
-//  LOGIN
+// LOGIN
 // ════════════════════════════════════════════
 document.getElementById('btn-login').addEventListener('click', doLogin);
 document.getElementById('login-pass').addEventListener('keydown', e => {
@@ -82,9 +98,9 @@ async function doLogin() {
 
   try {
     const res  = await fetch('/api/login', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password })
     });
     const data = await res.json();
 
@@ -95,14 +111,10 @@ async function doLogin() {
     }
 
     currentUser = { id: data.id, name: data.name, rol: data.rol };
-
-    // Guardar sesión para que persista al recargar
     localStorage.setItem('cl_session', JSON.stringify(currentUser));
-
     errEl.style.display = 'none';
     setNavUser(data.name, data.rol);
     await loadProducts();
-    await loadDemoCards();
     showPage('store');
 
   } catch (err) {
@@ -113,23 +125,20 @@ async function doLogin() {
 }
 
 // ════════════════════════════════════════════
-//  PRODUCTOS
+// PRODUCTOS
 // ════════════════════════════════════════════
 let allProducts = [];
 
 async function loadProducts() {
   const grid = document.getElementById('products-grid');
   grid.innerHTML = '<div class="loading-products">Cargando productos...</div>';
-
   try {
     const res  = await fetch('/api/productos');
     const data = await res.json();
     if (!data.success) throw new Error(data.message);
-
     allProducts = data.data;
     document.getElementById('search-bar').value = '';
     renderProducts(allProducts);
-
   } catch (err) {
     grid.innerHTML = `<div class="loading-products" style="color:var(--cl-error)">Error: ${err.message}</div>`;
   }
@@ -138,30 +147,28 @@ async function loadProducts() {
 function renderProducts(products) {
   const grid = document.getElementById('products-grid');
   grid.innerHTML = '';
-
   if (products.length === 0) {
     grid.innerHTML = '<div class="loading-products">No se encontraron productos.</div>';
     return;
   }
-
   products.forEach(p => {
-    const icon = getIcon(p.nombre);
-    const card = document.createElement('div');
-    card.className = 'product-card' + (p.disponible ? '' : ' unavailable');
+    const enStock = p.disponible && parseInt(p.cantidad) > 0;
+    const icon    = getIcon(p.nombre);
+    const card    = document.createElement('div');
+    card.className = 'product-card' + (enStock ? '' : ' unavailable');
     card.innerHTML = `
       <div class="product-icon">${icon}</div>
       <div class="product-name">${p.nombre}</div>
       <div class="product-price">$${fmtPrice(p.precio)} <span>USD</span></div>
-      <span class="product-badge ${p.disponible ? 'badge-available' : 'badge-unavailable'}">
-        ${p.disponible ? `Disponible (${p.cantidad})` : 'Sin stock'}
+      <span class="product-badge ${enStock ? 'badge-available' : 'badge-unavailable'}">
+        ${enStock ? `Disponible (${p.cantidad})` : 'Sin stock'}
       </span>
-      ${p.disponible
+      ${enStock
         ? `<button class="btn-add" data-id="${p.id}" data-name="${p.nombre}" data-price="${p.precio}" data-icon="${icon}">+ Agregar</button>`
         : ''}
     `;
     grid.appendChild(card);
   });
-
   grid.querySelectorAll('.btn-add').forEach(btn => {
     btn.addEventListener('click', () => {
       addToCart(btn.dataset.id, btn.dataset.name, parseFloat(btn.dataset.price), btn.dataset.icon);
@@ -169,14 +176,13 @@ function renderProducts(products) {
   });
 }
 
-// ── BÚSQUEDA ──
 document.getElementById('search-bar').addEventListener('input', function () {
   const q = this.value.toLowerCase().trim();
   renderProducts(q ? allProducts.filter(p => p.nombre.toLowerCase().includes(q)) : allProducts);
 });
 
 // ════════════════════════════════════════════
-//  CARRITO — agrupado por producto
+// CARRITO — agrupado por producto
 // ════════════════════════════════════════════
 function addToCart(id, name, price, icon) {
   const existing = cart.find(i => i.id === id);
@@ -193,9 +199,8 @@ function renderCart() {
   const totalEl     = document.getElementById('cart-total');
   const countEl     = document.getElementById('cart-count');
   const checkoutBtn = document.getElementById('btn-checkout');
-
-  const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
-  const total      = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const totalItems  = cart.reduce((s, i) => s + i.quantity, 0);
+  const total       = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
   countEl.textContent  = totalItems;
   totalEl.textContent  = fmtPrice(total);
@@ -250,58 +255,12 @@ function renderCart() {
 document.getElementById('btn-checkout').addEventListener('click', () => {
   if (cart.length === 0) return;
   renderSummary();
-  showPage('payment');
+  hideMsg('checkout-msg');
+  showPage('checkout');
 });
 
 // ════════════════════════════════════════════
-//  TARJETAS DE PRUEBA — desde la BD
-// ════════════════════════════════════════════
-async function loadDemoCards() {
-  const container = document.getElementById('demo-cards-list');
-  container.innerHTML = '<div class="loading-products">Cargando...</div>';
-
-  try {
-    const res  = await fetch('/api/tarjetas');
-    const data = await res.json();
-    if (!data.success) throw new Error(data.message);
-
-    container.innerHTML = '';
-    data.data.forEach(t => {
-      const saldo = parseFloat(t.cantidad_disponible);
-      const label = saldo < 100 ? 'Sin fondos ✗' : 'Válida ✓';
-      const row   = document.createElement('div');
-      row.className = 'demo-card-row';
-      row.innerHTML = `
-        <span class="dl">${t.nombre_titular}</span>
-        <span class="dv"
-          data-holder="${t.nombre_titular}"
-          data-num="${t.numero_tarjeta}"
-          data-exp="${t.fecha_vencimiento}"
-          data-cvv="${t.codigo_seguridad}">
-          ${maskCard(t.numero_tarjeta)} <small style="color:var(--cl-mid)">${label}</small>
-        </span>
-      `;
-      container.appendChild(row);
-    });
-
-    container.querySelectorAll('.dv').forEach(el => {
-      el.addEventListener('click', () => {
-        document.getElementById('p-holder').value = el.dataset.holder;
-        document.getElementById('p-number').value = el.dataset.num.replace(/(.{4})/g, '$1 ').trim();
-        document.getElementById('p-exp').value    = el.dataset.exp;
-        document.getElementById('p-cvv').value    = el.dataset.cvv;
-        updateCardVisual();
-        validateCardNum(); validateExp(); validateCvv();
-      });
-    });
-
-  } catch (err) {
-    container.innerHTML = '<div style="color:var(--cl-error);font-size:12px">Error al cargar tarjetas.</div>';
-  }
-}
-
-// ════════════════════════════════════════════
-//  PAGO
+// CHECKOUT — entrega + metodo de pago (sin tarjeta)
 // ════════════════════════════════════════════
 document.getElementById('btn-back-store').addEventListener('click', () => showPage('store'));
 
@@ -321,129 +280,88 @@ function renderSummary() {
   document.getElementById('summary-total').textContent = fmtPrice(total);
 }
 
-function updateCardVisual() {
-  const holder = document.getElementById('p-holder').value || 'NOMBRE TITULAR';
-  const num    = document.getElementById('p-number').value || '•••• •••• •••• ••••';
-  const exp    = document.getElementById('p-exp').value    || 'MM/AA';
-  document.getElementById('card-holder-display').textContent = holder.toUpperCase().slice(0, 22);
-  document.getElementById('card-display').textContent        = num;
-  document.getElementById('card-exp-display').textContent    = exp;
-}
+// Mostrar el campo de referencia solo si el metodo es transferencia
+document.querySelectorAll('input[name="metodo-pago"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    const group = document.getElementById('referencia-group');
+    const selected = document.querySelector('input[name="metodo-pago"]:checked').value;
+    group.style.display = (selected === 'transferencia') ? 'block' : 'none';
+  });
+});
 
-document.getElementById('p-holder').addEventListener('input', updateCardVisual);
-document.getElementById('p-number').addEventListener('input', function () { formatCardNum(this); updateCardVisual(); });
-document.getElementById('p-exp').addEventListener('input',    function () { formatExpDate(this); updateCardVisual(); });
-document.getElementById('p-cvv').addEventListener('input',    function () { formatCvv(this); });
+document.getElementById('btn-confirm-sale').addEventListener('click', confirmSale);
 
-function formatCardNum(input) {
-  let v = input.value.replace(/\D/g, '');
-  if (v.length > 16) v = v.slice(0, 16);
-  input.value = v.replace(/(.{4})/g, '$1 ').trim();
-  validateCardNum();
-}
-function formatExpDate(input) {
-  let v = input.value.replace(/\D/g, '');
-  if (v.length > 4) v = v.slice(0, 4);
-  if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2);
-  input.value = v;
-  validateExp();
-}
-function formatCvv(input) {
-  input.value = input.value.replace(/\D/g, '').slice(0, 3);
-  validateCvv();
-}
+async function confirmSale() {
+  hideMsg('checkout-msg');
 
-function luhn(n) {
-  let s = 0, even = false;
-  for (let i = n.length - 1; i >= 0; i--) {
-    let d = parseInt(n[i], 10);
-    if (even) { d *= 2; if (d > 9) d -= 9; }
-    s += d; even = !even;
-  }
-  return s % 10 === 0;
-}
+  const deliveryName    = document.getElementById('d-name').value.trim();
+  const deliveryAddress = document.getElementById('d-address').value.trim();
+  const deliveryCity    = document.getElementById('d-city').value.trim();
+  const deliveryPhone   = document.getElementById('d-phone').value.trim();
+  const deliveryNotes   = document.getElementById('d-notes').value.trim();
+  const metodoPago      = document.querySelector('input[name="metodo-pago"]:checked').value;
+  const referencia      = document.getElementById('p-referencia').value.trim();
+  const total           = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
-function setField(inputId, iconId, helpId, valid, msg) {
-  document.getElementById(inputId).className = valid ? 'valid' : 'invalid';
-  const icon = document.getElementById(iconId);
-  icon.textContent = valid ? '✓' : '✗';
-  icon.className = 'field-icon show ' + (valid ? 'valid-icon' : 'invalid-icon');
-  if (helpId) { const h = document.getElementById(helpId); h.textContent = msg || ''; h.className = 'field-help' + (valid ? '' : ' error'); }
-}
-function clearField(inputId, iconId, helpId) {
-  document.getElementById(inputId).className = '';
-  document.getElementById(iconId).className  = 'field-icon';
-  if (helpId) { const h = document.getElementById(helpId); h.textContent = ''; h.className = 'field-help'; }
-}
+  if (!deliveryName)    { showMsg('checkout-msg', 'Ingresa el nombre del destinatario.'); return; }
+  if (!deliveryAddress) { showMsg('checkout-msg', 'Ingresa la dirección de entrega.'); return; }
+  if (!deliveryCity)    { showMsg('checkout-msg', 'Ingresa la ciudad.'); return; }
+  if (!deliveryPhone)   { showMsg('checkout-msg', 'Ingresa el teléfono de contacto.'); return; }
 
-function validateCardNum() {
-  const raw = document.getElementById('p-number').value.replace(/\s/g, '');
-  if (!raw) { clearField('p-number','icon-number','help-number'); return false; }
-  if (raw.length < 16) { setField('p-number','icon-number','help-number', false, 'El número debe tener 16 dígitos'); return false; }
-  if (!luhn(raw))      { setField('p-number','icon-number','help-number', false, 'Número de tarjeta inválido'); return false; }
-  setField('p-number','icon-number','help-number', true, ''); return true;
-}
-function validateExp() {
-  const v = document.getElementById('p-exp').value;
-  if (!v || v.length < 5) { clearField('p-exp','icon-exp','help-exp'); return false; }
-  const [m, y] = v.split('/').map(Number);
-  const now = new Date(), cm = now.getMonth() + 1, cy = now.getFullYear() % 100;
-  if (!m || !y || m < 1 || m > 12) { setField('p-exp','icon-exp','help-exp', false, 'Mes inválido (01–12)'); return false; }
-  if (y < cy || (y === cy && m < cm)) { setField('p-exp','icon-exp','help-exp', false, 'Tarjeta vencida'); return false; }
-  setField('p-exp','icon-exp','help-exp', true, ''); return true;
-}
-function validateCvv() {
-  const v = document.getElementById('p-cvv').value;
-  if (!v) { clearField('p-cvv','icon-cvv','help-cvv'); return false; }
-  if (v.length < 3) { setField('p-cvv','icon-cvv','help-cvv', false, 'CVV debe tener 3 dígitos'); return false; }
-  setField('p-cvv','icon-cvv','help-cvv', true, ''); return true;
-}
-
-document.getElementById('btn-pay').addEventListener('click', processPayment);
-
-async function processPayment() {
-  const holder = document.getElementById('p-holder').value.trim();
-  const numRaw = document.getElementById('p-number').value.replace(/\s/g, '');
-  const exp    = document.getElementById('p-exp').value;
-  const cvv    = document.getElementById('p-cvv').value;
-  const total  = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-
-  if (!holder)            { alert('Por favor ingresa el nombre del titular.'); return; }
-  if (!validateCardNum()) { alert('Número de tarjeta inválido.'); return; }
-  if (!validateExp())     { alert('Fecha de vencimiento inválida o tarjeta vencida.'); return; }
-  if (!validateCvv())     { alert('Código CVV inválido.'); return; }
-
-  document.getElementById('btn-pay').disabled    = true;
-  document.getElementById('btn-pay').textContent = 'Procesando...';
+  const btn = document.getElementById('btn-confirm-sale');
+  btn.disabled    = true;
+  btn.textContent = 'Registrando...';
 
   try {
-    const res  = await fetch('/api/pago', {
-      method:  'POST',
+    const res  = await fetch('/api/ventas', {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        cardHolder:     holder,
-        cardNumber:     numRaw,
-        expirationDate: exp,
-        securityCode:   cvv,
-        amount:         total,
-        items:          cart.map(i => ({ id: i.id, quantity: i.quantity }))
+      body: JSON.stringify({
+        amount:     total,
+        userId:     currentUser ? currentUser.id : null,
+        metodoPago: metodoPago,
+        referencia: referencia,
+        items:      cart.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+        delivery: {
+          name:    deliveryName,
+          address: deliveryAddress,
+          city:    deliveryCity,
+          phone:   deliveryPhone,
+          notes:   deliveryNotes
+        }
       })
     });
     const data = await res.json();
 
-    if (!data.success) { alert('❌ ' + data.message); return; }
+    if (!data.success) {
+      showMsg('checkout-msg', data.message);
+      return;
+    }
 
     document.getElementById('success-order-num').textContent = '#' + data.orderNumber;
+    buildSuccessDelivery({ name: deliveryName, address: deliveryAddress, city: deliveryCity, phone: deliveryPhone, notes: deliveryNotes });
     buildSuccessDetail(total);
     showPage('success');
 
   } catch (err) {
-    alert('Error de conexión con el servidor.');
-    console.error('processPayment error:', err);
+    showMsg('checkout-msg', 'Error de conexión con el servidor.');
+    console.error('confirmSale error:', err);
   } finally {
-    document.getElementById('btn-pay').disabled    = false;
-    document.getElementById('btn-pay').textContent = 'Pagar ahora';
+    btn.disabled    = false;
+    btn.textContent = 'Confirmar venta';
   }
+}
+
+function buildSuccessDelivery(d) {
+  const el = document.getElementById('success-delivery');
+  el.innerHTML = `
+    <div class="delivery-summary-title">Datos de entrega</div>
+    <div class="delivery-row"><span>Destinatario</span><b>${d.name}</b></div>
+    <div class="delivery-row"><span>Dirección</span><b>${d.address}</b></div>
+    <div class="delivery-row"><span>Ciudad</span><b>${d.city}</b></div>
+    <div class="delivery-row"><span>Teléfono</span><b>${d.phone}</b></div>
+    ${d.notes ? `<div class="delivery-row"><span>Notas</span><b>${d.notes}</b></div>` : ''}
+  `;
 }
 
 function buildSuccessDetail(total) {
@@ -458,25 +376,109 @@ function buildSuccessDetail(total) {
   const tot = document.createElement('div');
   tot.className = 'detail-row';
   tot.style.cssText = 'border-top:2px solid var(--cl-warm);margin-top:4px;padding-top:8px;';
-  tot.innerHTML = `<span><b>Total pagado</b></span><span>$${fmtPrice(total)}</span>`;
+  tot.innerHTML = `<span><b>Total</b></span><span>$${fmtPrice(total)}</span>`;
   el.appendChild(tot);
 }
 
 document.getElementById('btn-new-order').addEventListener('click', async () => {
   cart = [];
   renderCart();
-  ['p-holder','p-number','p-exp','p-cvv'].forEach(id => document.getElementById(id).value = '');
-  ['number','exp','cvv'].forEach(f => clearField('p-' + f, 'icon-' + f, 'help-' + f));
-  updateCardVisual();
+  ['d-name','d-address','d-city','d-phone','d-notes','p-referencia'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.querySelector('input[name="metodo-pago"][value="efectivo"]').checked = true;
+  document.getElementById('referencia-group').style.display = 'none';
   await loadProducts();
   showPage('store');
 });
 
 // ════════════════════════════════════════════
-//  ADMIN — gestión de productos
+// VENTAS — panel para el admin
 // ════════════════════════════════════════════
+document.getElementById('btn-back-store-ventas').addEventListener('click', async () => {
+  await loadProducts();
+  showPage('store');
+});
 
-// Al volver desde admin recarga los productos con los cambios aplicados
+const METODO_LABELS = {
+  efectivo: '💵 Efectivo',
+  datafono: '💳 Datáfono',
+  transferencia: '🏦 Transferencia'
+};
+
+async function loadVentas() {
+  const container  = document.getElementById('ventas-list');
+  const summaryBar = document.getElementById('ventas-summary');
+  container.innerHTML = '<div class="loading-products">Cargando ventas...</div>';
+  summaryBar.innerHTML = '';
+
+  try {
+    const res  = await fetch('/api/ventas');
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
+
+    const ventas = data.data;
+    const totalVendido = ventas.reduce((s, v) => s + parseFloat(v.total), 0);
+
+    summaryBar.innerHTML = `
+      <div><span class="vs-label">Ventas registradas</span><br><span class="vs-value">${ventas.length}</span></div>
+      <div><span class="vs-label">Total vendido</span><br><span class="vs-value">$${fmtPrice(totalVendido)}</span></div>
+    `;
+
+    if (ventas.length === 0) {
+      container.innerHTML = '<div class="ventas-empty">Todavía no se han registrado ventas.</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    ventas.forEach(v => {
+      const fecha = new Date(v.fecha_pedido).toLocaleString('es-CO', {
+        day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit'
+      });
+      const metodoLabel = METODO_LABELS[v.metodo_pago] || v.metodo_pago;
+
+      const card = document.createElement('div');
+      card.className = 'venta-card';
+      card.innerHTML = `
+        <div class="venta-header">
+          <div>
+            <div class="venta-order-num">#${v.numero_pedido}</div>
+            <div class="venta-date">${fecha}</div>
+          </div>
+          <div class="venta-badges">
+            <span class="venta-badge badge-vendedor">Vendido por ${v.vendedor_nombre || 'usuario eliminado'}</span>
+            <span class="venta-badge badge-metodo">${metodoLabel}</span>
+          </div>
+        </div>
+        <div class="venta-delivery">
+          <div class="delivery-row"><span>Cliente</span><b>${v.nombre_destinatario}</b></div>
+          <div class="delivery-row"><span>Dirección</span><b>${v.direccion}, ${v.ciudad}</b></div>
+          <div class="delivery-row"><span>Teléfono</span><b>${v.telefono}</b></div>
+          ${v.referencia_pago ? `<div class="delivery-row"><span>Referencia</span><b>${v.referencia_pago}</b></div>` : ''}
+          ${v.notas ? `<div class="delivery-row"><span>Notas</span><b>${v.notas}</b></div>` : ''}
+        </div>
+        <div class="venta-items">
+          ${v.items.map(it => `
+            <div class="venta-item-row">
+              <span>${getIcon(it.nombre_producto)} ${it.nombre_producto} ×${it.cantidad}</span>
+              <span>$${fmtPrice(it.precio_unitario * it.cantidad)}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="venta-total-row"><span>Total</span><span>$${fmtPrice(v.total)}</span></div>
+      `;
+      container.appendChild(card);
+    });
+
+  } catch (err) {
+    container.innerHTML = `<div class="ventas-empty" style="color:var(--cl-error)">Error: ${err.message}</div>`;
+  }
+}
+
+// ════════════════════════════════════════════
+// ADMIN — CRUD completo de productos
+// ════════════════════════════════════════════
 document.getElementById('btn-back-store-admin').addEventListener('click', async () => {
   await loadProducts();
   showPage('store');
@@ -484,8 +486,7 @@ document.getElementById('btn-back-store-admin').addEventListener('click', async 
 
 async function loadAdminProducts() {
   const tbody = document.getElementById('admin-tbody');
-  tbody.innerHTML = '<tr><td colspan="5" class="loading-products">Cargando productos...</td></tr>';
-
+  tbody.innerHTML = '<tr><td colspan="5" class="loading-products">Cargando...</td></tr>';
   try {
     const res  = await fetch('/api/productos');
     const data = await res.json();
@@ -495,7 +496,7 @@ async function loadAdminProducts() {
     data.data.forEach(p => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="td-name">${getIcon(p.nombre)} ${p.nombre}</td>
+        <td class="td-name">${getIcon(p.nombre)} <input type="text" class="admin-input-full" value="${p.nombre}" data-field="nombre"></td>
         <td><input type="number" class="admin-input" value="${p.precio}" min="0" step="0.01" data-field="precio"></td>
         <td><input type="number" class="admin-input" value="${p.cantidad}" min="0" step="1" data-field="cantidad"></td>
         <td class="td-center">
@@ -504,13 +505,21 @@ async function loadAdminProducts() {
             <span class="toggle-slider"></span>
           </label>
         </td>
-        <td><button class="btn-save-row" data-id="${p.id}">Guardar</button></td>
+        <td>
+          <div class="admin-actions">
+            <button class="btn-save-row" data-id="${p.id}">Guardar</button>
+            <button class="btn-delete-row" data-id="${p.id}">Eliminar</button>
+          </div>
+        </td>
       `;
       tbody.appendChild(tr);
     });
 
     tbody.querySelectorAll('.btn-save-row').forEach(btn => {
       btn.addEventListener('click', () => saveProduct(btn.dataset.id, btn));
+    });
+    tbody.querySelectorAll('.btn-delete-row').forEach(btn => {
+      btn.addEventListener('click', () => confirmDeleteProduct(btn));
     });
 
   } catch (err) {
@@ -520,49 +529,134 @@ async function loadAdminProducts() {
 
 async function saveProduct(id, btn) {
   const row        = btn.closest('tr');
+  const nombre     = row.querySelector('[data-field="nombre"]').value.trim();
   const precio     = row.querySelector('[data-field="precio"]').value;
   const cantidad   = row.querySelector('[data-field="cantidad"]').value;
   const disponible = row.querySelector('[data-field="disponible"]').checked;
+
+  if (!nombre) {
+    const original = btn.textContent;
+    btn.textContent = 'Falta el nombre';
+    btn.style.background = 'var(--cl-error)';
+    setTimeout(() => { btn.textContent = original; btn.style.background = ''; }, 2000);
+    return;
+  }
 
   btn.disabled    = true;
   btn.textContent = 'Guardando...';
 
   try {
     const res  = await fetch(`/api/productos/${id}`, {
-      method:  'PUT',
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ precio, cantidad, disponible })
+      body: JSON.stringify({ nombre, precio, cantidad, disponible })
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.message);
 
-    btn.textContent       = '✓ Guardado';
-    btn.style.background  = '#2d6a4f';
-    btn.style.borderColor = '#2d6a4f';
+    btn.textContent      = 'Guardado';
+    btn.style.background = '#2d6a4f';
     setTimeout(() => {
-      btn.textContent       = 'Guardar';
-      btn.style.background  = '';
-      btn.style.borderColor = '';
+      btn.textContent      = 'Guardar';
+      btn.style.background = '';
       btn.disabled          = false;
     }, 2000);
 
   } catch (err) {
-    btn.textContent      = 'Error';
+    btn.textContent      = err.message || 'Error';
     btn.style.background = 'var(--cl-error)';
     setTimeout(() => {
       btn.textContent      = 'Guardar';
       btn.style.background = '';
-      btn.disabled         = false;
+      btn.disabled          = false;
+    }, 2500);
+  }
+}
+
+function confirmDeleteProduct(btn) {
+  if (btn.dataset.confirming === 'true') {
+    deleteProduct(btn.dataset.id, btn);
+    return;
+  }
+  btn.dataset.confirming = 'true';
+  btn.dataset.original   = btn.textContent;
+  btn.textContent        = '¿Confirmar?';
+  btn.classList.add('confirming');
+
+  setTimeout(() => {
+    if (btn.dataset.confirming === 'true') {
+      btn.dataset.confirming = 'false';
+      btn.textContent        = btn.dataset.original;
+      btn.classList.remove('confirming');
+    }
+  }, 3000);
+}
+
+async function deleteProduct(id, btn) {
+  btn.disabled    = true;
+  btn.textContent = 'Eliminando...';
+  try {
+    const res  = await fetch(`/api/productos/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
+    btn.closest('tr').remove();
+  } catch (err) {
+    btn.textContent        = 'Error';
+    btn.dataset.confirming = 'false';
+    btn.classList.remove('confirming');
+    setTimeout(() => {
+      btn.textContent = 'Eliminar';
+      btn.disabled    = false;
     }, 2000);
   }
 }
 
+document.getElementById('btn-add-product').addEventListener('click', addNewProduct);
+
+async function addNewProduct() {
+  const nombre     = document.getElementById('new-name').value.trim();
+  const precio     = document.getElementById('new-price').value;
+  const cantidad   = document.getElementById('new-stock').value;
+  const disponible = document.getElementById('new-disponible').checked;
+
+  if (!nombre)                                   { showMsg('add-product-msg', 'El nombre es obligatorio.'); return; }
+  if (!precio || parseFloat(precio) < 0)         { showMsg('add-product-msg', 'Ingresa un precio válido.'); return; }
+  if (cantidad === '' || parseInt(cantidad) < 0) { showMsg('add-product-msg', 'Ingresa una cantidad válida.'); return; }
+
+  const btn = document.getElementById('btn-add-product');
+  btn.disabled    = true;
+  btn.textContent = 'Agregando...';
+
+  try {
+    const res  = await fetch('/api/productos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, precio: parseFloat(precio), cantidad: parseInt(cantidad), disponible })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
+
+    showMsg('add-product-msg', 'Producto agregado correctamente.', 'success');
+    document.getElementById('new-name').value  = '';
+    document.getElementById('new-price').value = '';
+    document.getElementById('new-stock').value = '';
+    document.getElementById('new-disponible').checked = true;
+
+    loadAdminProducts();
+
+  } catch (err) {
+    showMsg('add-product-msg', err.message);
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '+ Agregar producto';
+  }
+}
+
 // ════════════════════════════════════════════
-//  INIT — restaurar sesión al recargar página
+// INIT — restaurar sesión al recargar la página
 // ════════════════════════════════════════════
 (async () => {
   renderCart();
-
   const saved = localStorage.getItem('cl_session');
   if (saved) {
     try {
@@ -570,7 +664,6 @@ async function saveProduct(id, btn) {
       currentUser = user;
       setNavUser(user.name, user.rol);
       await loadProducts();
-      await loadDemoCards();
       showPage('store');
     } catch (e) {
       localStorage.removeItem('cl_session');
