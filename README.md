@@ -17,6 +17,24 @@ cd C:\Users\theal\Documents\Universidad\doo2026\castano-living
 node server.js
 ```
 
+## Nuevo: comprobante en PDF
+
+Cada venta ahora se puede imprimir en dos momentos:
+- **Al terminar de vender** (pantalla de éxito) — botón "Imprimir comprobante", disponible para quien acaba de vender, sea vendedor o admin.
+- **Desde el panel de Ventas** (solo admin) — cada tarjeta tiene su propio botón "Imprimir", por si hay que reimprimir una venta anterior.
+
+El botón abre el PDF en una pestaña nueva del navegador; desde ahí se
+imprime con Ctrl+P o se guarda. El PDF incluye datos de entrega,
+productos, total y método de pago — sirve como recibo para el cliente
+y como orden de entrega para quien reparte el mueble.
+
+**Nueva dependencia:** hay que correr `npm install` de nuevo después de
+reemplazar `package.json`, porque se agregó `pdfkit`.
+
+**Archivo nuevo:** `lib/pdfPedido.js` — separé la generación del PDF en
+su propio archivo en vez de meterlo todo en `server.js`, para que cada
+archivo tenga una sola responsabilidad clara.
+
 ## Qué cambió en esta entrega
 
 **Se eliminó por completo la simulación de pago con tarjeta.** Ya no hay
@@ -54,6 +72,7 @@ número total de ventas y el monto acumulado.
 | DELETE | /api/productos/:id | Admin     | Elimina producto                          |
 | POST   | /api/ventas        | Todos     | Registra la venta (valida y descuenta stock) |
 | GET    | /api/ventas        | Admin     | Lista todas las ventas con sus items      |
+| GET    | /api/ventas/:id/pdf| Todos     | Genera el comprobante en PDF de un pedido |
 
 ## Nota importante sobre seguridad
 
@@ -68,8 +87,8 @@ es bloqueante.
 ## Pendiente
 - Pedidos personalizados / encargos por Instagram
 - Asociar sillas específicas a cada mesa
-- Imprimir pedido y recibo de caja (PDF)
-- Pagos parciales con adelanto
+- Pagos parciales con adelanto (el PDF ya deja el espacio listo para
+  mostrar saldo pendiente cuando esto se implemente)
 - Rol de bodega + comunicación en tiempo real
 - Validar rol del usuario en el servidor (ver nota de seguridad arriba)
 - ESLint, Git con ramas, mappers/adapters

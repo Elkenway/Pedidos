@@ -1,6 +1,7 @@
 const express = require('express');
 const { Pool } = require('pg');
 const path = require('path');
+const { generarPdfPedido } = require('./lib/pdfPedido');
 
 const app  = express();
 const PORT = 3000;
@@ -196,7 +197,12 @@ app.post('/api/ventas', async (req, res) => {
     }
 
     await client.query('COMMIT');
-    res.json({ success: true, message: 'Venta registrada con éxito.', orderNumber: pedido.numero_pedido });
+    res.json({
+      success: true,
+      message: 'Venta registrada con éxito.',
+      orderNumber: pedido.numero_pedido,
+      orderId: pedido.id
+    });
 
   } catch (err) {
     await client.query('ROLLBACK');
@@ -237,6 +243,41 @@ app.get('/api/ventas', async (req, res) => {
   } catch (err) {
     console.error('Error /api/ventas GET:', err.message);
     res.status(500).json({ success: false, message: 'Error al obtener las ventas.' });
+  }
+});
+
+// ── GET /api/ventas/:id/pdf ──
+// Genera el comprobante en PDF de un pedido puntual. No se restringe
+// por rol: lo puede pedir quien acaba de hacer la venta (vendedor o
+// admin, desde la pantalla de éxito) o el admin reimprimiendo desde
+// el panel de Ventas.
+app.get('/api/ventas/:id/pdf', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const pedidoRes = await pool.query(`
+      SELECT p.*, u.nombre AS vendedor_nombre
+      FROM pedidos p
+      LEFT JOIN usuarios u ON p.usuario_id = u.id
+      WHERE p.id = $1
+    `, [id]);
+
+    if (pedidoRes.rows.length === 0)
+      return res.status(404).json({ success: false, message: 'El pedido no existe.' });
+
+    const itemsRes = await pool.query(
+      'SELECT nombre_producto, precio_unitario, cantidad FROM pedido_items WHERE pedido_id = $1 ORDER BY id ASC',
+      [id]
+    );
+
+    const venta = { ...pedidoRes.rows[0], items: itemsRes.rows };
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="pedido-${venta.numero_pedido}.pdf"`);
+    generarPdfPedido(venta, res);
+
+  } catch (err) {
+    console.error('Error /api/ventas/:id/pdf:', err.message);
+    res.status(500).json({ success: false, message: 'Error al generar el PDF.' });
   }
 });
 
