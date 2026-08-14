@@ -341,6 +341,9 @@ async function confirmSale() {
     document.getElementById('success-order-num').textContent = '#' + data.orderNumber;
     buildSuccessDelivery({ name: deliveryName, address: deliveryAddress, city: deliveryCity, phone: deliveryPhone, notes: deliveryNotes });
     buildSuccessDetail(total);
+    document.getElementById('btn-print-receipt').onclick = () => {
+      window.open(`/api/ventas/${data.orderId}/pdf`, '_blank');
+    };
     showPage('success');
 
   } catch (err) {
@@ -446,9 +449,12 @@ async function loadVentas() {
             <div class="venta-order-num">#${v.numero_pedido}</div>
             <div class="venta-date">${fecha}</div>
           </div>
-          <div class="venta-badges">
-            <span class="venta-badge badge-vendedor">Vendido por ${v.vendedor_nombre || 'usuario eliminado'}</span>
-            <span class="venta-badge badge-metodo">${metodoLabel}</span>
+          <div class="venta-header-right">
+            <div class="venta-badges">
+              <span class="venta-badge badge-vendedor">Vendido por ${v.vendedor_nombre || 'usuario eliminado'}</span>
+              <span class="venta-badge badge-metodo">${metodoLabel}</span>
+            </div>
+            <button class="btn-print-venta" data-id="${v.id}">🖨️ Imprimir</button>
           </div>
         </div>
         <div class="venta-delivery">
@@ -469,6 +475,12 @@ async function loadVentas() {
         <div class="venta-total-row"><span>Total</span><span>$${fmtPrice(v.total)}</span></div>
       `;
       container.appendChild(card);
+    });
+
+    container.querySelectorAll('.btn-print-venta').forEach(btn => {
+      btn.addEventListener('click', () => {
+        window.open(`/api/ventas/${btn.dataset.id}/pdf`, '_blank');
+      });
     });
 
   } catch (err) {

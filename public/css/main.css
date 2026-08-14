@@ -166,6 +166,9 @@ nav{background:var(--cl-dark);padding:0 2rem;display:flex;align-items:center;jus
 .success-detail .detail-row span:last-child{font-weight:bold;color:var(--cl-warm);}
 .btn-new-order{background:var(--cl-dark);color:var(--cl-warm);border:none;padding:14px 2rem;border-radius:var(--radius);font-size:12px;letter-spacing:2px;text-transform:uppercase;font-family:Arial,sans-serif;cursor:pointer;transition:var(--transition);}
 .btn-new-order:hover{background:var(--cl-mid);}
+.success-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
+.btn-print{background:transparent;color:var(--cl-dark);border:1px solid var(--cl-dark);padding:14px 1.5rem;border-radius:var(--radius);font-size:12px;letter-spacing:2px;text-transform:uppercase;font-family:Arial,sans-serif;cursor:pointer;transition:var(--transition);}
+.btn-print:hover{background:var(--cl-dark);color:var(--cl-warm);}
 
 /* ADMIN (compartido con Ventas) */
 .admin-hero{background:var(--cl-dark);padding:2.5rem 2rem;border-bottom:2px solid var(--cl-warm);}
@@ -221,7 +224,10 @@ nav{background:var(--cl-dark);padding:0 2rem;display:flex;align-items:center;jus
 .venta-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--cl-light);}
 .venta-order-num{font-size:18px;font-weight:bold;color:var(--cl-dark);font-family:Arial,sans-serif;}
 .venta-date{font-size:11px;color:var(--cl-mid);font-family:Arial,sans-serif;margin-top:2px;}
-.venta-badges{display:flex;gap:6px;flex-wrap:wrap;}
+.venta-header-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+.venta-badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+.btn-print-venta{background:transparent;color:var(--cl-mid);border:1px solid var(--cl-border);padding:5px 12px;border-radius:var(--radius);font-size:10px;letter-spacing:1px;text-transform:uppercase;font-family:Arial,sans-serif;cursor:pointer;transition:var(--transition);white-space:nowrap;}
+.btn-print-venta:hover{background:var(--cl-dark);color:var(--cl-warm);border-color:var(--cl-dark);}
 .venta-badge{font-size:10px;letter-spacing:1px;text-transform:uppercase;font-family:Arial,sans-serif;padding:4px 10px;border-radius:12px;white-space:nowrap;}
 .badge-vendedor{background:var(--cl-light);color:var(--cl-mid);}
 .badge-metodo{background:#e8f5ef;color:var(--cl-success);}
