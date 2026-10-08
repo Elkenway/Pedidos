@@ -1,10 +1,3 @@
-/* ============================================
-   CASTANO LIVING | app.js
-   Sin tarjeta simulada. El pago se registra
-   (efectivo / datafono / transferencia), no se
-   procesa. Incluye panel de Ventas para admin.
-   ============================================ */
-
 let currentUser = null;
 let cart = [];
 
@@ -256,11 +249,14 @@ document.getElementById('btn-checkout').addEventListener('click', () => {
   if (cart.length === 0) return;
   renderSummary();
   hideMsg('checkout-msg');
+  document.querySelector('input[name="tipo-pago"][value="completo"]').checked = true;
+  document.getElementById('monto-parcial-group').style.display = 'none';
+  document.getElementById('summary-pagar-ahora').style.display = 'none';
   showPage('checkout');
 });
 
 // ════════════════════════════════════════════
-// CHECKOUT — entrega + metodo de pago (sin tarjeta)
+// CHECKOUT 
 // ════════════════════════════════════════════
 document.getElementById('btn-back-store').addEventListener('click', () => showPage('store'));
 
@@ -289,6 +285,26 @@ document.querySelectorAll('input[name="metodo-pago"]').forEach(radio => {
   });
 });
 
+// Completo vs adelanto
+document.querySelectorAll('input[name="tipo-pago"]').forEach(radio => {
+  radio.addEventListener('change', updateTipoPagoUI);
+});
+document.getElementById('p-monto-parcial').addEventListener('input', updateResumenPago);
+
+function updateTipoPagoUI() {
+  const tipo = document.querySelector('input[name="tipo-pago"]:checked').value;
+  document.getElementById('monto-parcial-group').style.display   = (tipo === 'parcial') ? 'block' : 'none';
+  document.getElementById('summary-pagar-ahora').style.display   = (tipo === 'parcial') ? 'flex'  : 'none';
+  updateResumenPago();
+}
+
+function updateResumenPago() {
+  const tipo = document.querySelector('input[name="tipo-pago"]:checked').value;
+  if (tipo !== 'parcial') return;
+  const monto = parseFloat(document.getElementById('p-monto-parcial').value) || 0;
+  document.getElementById('summary-pagar-ahora-val').textContent = '$' + fmtPrice(monto);
+}
+
 document.getElementById('btn-confirm-sale').addEventListener('click', confirmSale);
 
 async function confirmSale() {
@@ -299,6 +315,7 @@ async function confirmSale() {
   const deliveryCity    = document.getElementById('d-city').value.trim();
   const deliveryPhone   = document.getElementById('d-phone').value.trim();
   const deliveryNotes   = document.getElementById('d-notes').value.trim();
+  const tipoPago        = document.querySelector('input[name="tipo-pago"]:checked').value;
   const metodoPago      = document.querySelector('input[name="metodo-pago"]:checked').value;
   const referencia      = document.getElementById('p-referencia').value.trim();
   const total           = cart.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -307,6 +324,19 @@ async function confirmSale() {
   if (!deliveryAddress) { showMsg('checkout-msg', 'Ingresa la dirección de entrega.'); return; }
   if (!deliveryCity)    { showMsg('checkout-msg', 'Ingresa la ciudad.'); return; }
   if (!deliveryPhone)   { showMsg('checkout-msg', 'Ingresa el teléfono de contacto.'); return; }
+
+  let montoPagado = total;
+  if (tipoPago === 'parcial') {
+    montoPagado = parseFloat(document.getElementById('p-monto-parcial').value);
+    if (isNaN(montoPagado) || montoPagado <= 0) {
+      showMsg('checkout-msg', 'Ingresa el monto del adelanto.');
+      return;
+    }
+    if (montoPagado >= total) {
+      showMsg('checkout-msg', 'El adelanto debe ser menor al total. Si va a pagar todo, selecciona "Pago completo".');
+      return;
+    }
+  }
 
   const btn = document.getElementById('btn-confirm-sale');
   btn.disabled    = true;
@@ -317,11 +347,12 @@ async function confirmSale() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        amount:     total,
-        userId:     currentUser ? currentUser.id : null,
-        metodoPago: metodoPago,
-        referencia: referencia,
-        items:      cart.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+        total:       total,
+        montoPagado: montoPagado,
+        userId:      currentUser ? currentUser.id : null,
+        metodoPago:  metodoPago,
+        referencia:  referencia,
+        items:       cart.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
         delivery: {
           name:    deliveryName,
           address: deliveryAddress,
@@ -340,7 +371,7 @@ async function confirmSale() {
 
     document.getElementById('success-order-num').textContent = '#' + data.orderNumber;
     buildSuccessDelivery({ name: deliveryName, address: deliveryAddress, city: deliveryCity, phone: deliveryPhone, notes: deliveryNotes });
-    buildSuccessDetail(total);
+    buildSuccessDetail(total, montoPagado, data.saldoPendiente);
     document.getElementById('btn-print-receipt').onclick = () => {
       window.open(`/api/ventas/${data.orderId}/pdf`, '_blank');
     };
@@ -367,7 +398,7 @@ function buildSuccessDelivery(d) {
   `;
 }
 
-function buildSuccessDetail(total) {
+function buildSuccessDetail(total, montoPagado, saldoPendiente) {
   const el = document.getElementById('success-detail');
   el.innerHTML = '';
   cart.forEach(item => {
@@ -381,17 +412,32 @@ function buildSuccessDetail(total) {
   tot.style.cssText = 'border-top:2px solid var(--cl-warm);margin-top:4px;padding-top:8px;';
   tot.innerHTML = `<span><b>Total</b></span><span>$${fmtPrice(total)}</span>`;
   el.appendChild(tot);
+
+  if (saldoPendiente > 0.01) {
+    const pagadoRow = document.createElement('div');
+    pagadoRow.className = 'detail-row';
+    pagadoRow.innerHTML = `<span>Pagado ahora</span><span>$${fmtPrice(montoPagado)}</span>`;
+    el.appendChild(pagadoRow);
+
+    const saldoRow = document.createElement('div');
+    saldoRow.className = 'detail-row saldo-row';
+    saldoRow.innerHTML = `<span><b>Saldo pendiente</b></span><span><b>$${fmtPrice(saldoPendiente)}</b></span>`;
+    el.appendChild(saldoRow);
+  }
 }
 
 document.getElementById('btn-new-order').addEventListener('click', async () => {
   cart = [];
   renderCart();
-  ['d-name','d-address','d-city','d-phone','d-notes','p-referencia'].forEach(id => {
+  ['d-name','d-address','d-city','d-phone','d-notes','p-referencia','p-monto-parcial'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
   document.querySelector('input[name="metodo-pago"][value="efectivo"]').checked = true;
+  document.querySelector('input[name="tipo-pago"][value="completo"]').checked = true;
   document.getElementById('referencia-group').style.display = 'none';
+  document.getElementById('monto-parcial-group').style.display = 'none';
+  document.getElementById('summary-pagar-ahora').style.display = 'none';
   await loadProducts();
   showPage('store');
 });
@@ -405,9 +451,9 @@ document.getElementById('btn-back-store-ventas').addEventListener('click', async
 });
 
 const METODO_LABELS = {
-  efectivo: '💵 Efectivo',
-  datafono: '💳 Datáfono',
-  transferencia: '🏦 Transferencia'
+  efectivo: 'Efectivo',
+  datafono: 'Datáfono',
+  transferencia: 'Transferencia'
 };
 
 async function loadVentas() {
@@ -422,11 +468,13 @@ async function loadVentas() {
     if (!data.success) throw new Error(data.message);
 
     const ventas = data.data;
-    const totalVendido = ventas.reduce((s, v) => s + parseFloat(v.total), 0);
+    const totalVendido  = ventas.reduce((s, v) => s + parseFloat(v.total), 0);
+    const totalPorCobrar = ventas.reduce((s, v) => s + parseFloat(v.saldo_pendiente), 0);
 
     summaryBar.innerHTML = `
       <div><span class="vs-label">Ventas registradas</span><br><span class="vs-value">${ventas.length}</span></div>
       <div><span class="vs-label">Total vendido</span><br><span class="vs-value">$${fmtPrice(totalVendido)}</span></div>
+      ${totalPorCobrar > 0.01 ? `<div><span class="vs-label">Por cobrar</span><br><span class="vs-value vs-value-alert">$${fmtPrice(totalPorCobrar)}</span></div>` : ''}
     `;
 
     if (ventas.length === 0) {
@@ -454,7 +502,7 @@ async function loadVentas() {
               <span class="venta-badge badge-vendedor">Vendido por ${v.vendedor_nombre || 'usuario eliminado'}</span>
               <span class="venta-badge badge-metodo">${metodoLabel}</span>
             </div>
-            <button class="btn-print-venta" data-id="${v.id}">🖨️ Imprimir</button>
+            <button class="btn-print-venta" data-id="${v.id}">Imprimir</button>
           </div>
         </div>
         <div class="venta-delivery">
@@ -472,7 +520,24 @@ async function loadVentas() {
             </div>
           `).join('')}
         </div>
-        <div class="venta-total-row"><span>Total</span><span>$${fmtPrice(v.total)}</span></div>
+        <div class="venta-pago">
+          <div class="venta-pago-row"><span>Total</span><span>$${fmtPrice(v.total)}</span></div>
+          <div class="venta-pago-row pagado"><span>Pagado</span><span>$${fmtPrice(v.monto_pagado)}</span></div>
+          ${v.saldo_pendiente > 0.01 ? `
+            <div class="venta-pago-row saldo"><span>Saldo pendiente</span><span>$${fmtPrice(v.saldo_pendiente)}</span></div>
+            <div class="venta-abono-form" data-id="${v.id}">
+              <input type="number" class="abono-monto" placeholder="Monto" min="0.01" step="0.01" max="${v.saldo_pendiente}">
+              <select class="abono-metodo">
+                <option value="efectivo">Efectivo</option>
+                <option value="datafono">Datáfono</option>
+                <option value="transferencia">Transferencia</option>
+              </select>
+              <input type="text" class="abono-referencia" placeholder="Referencia (opcional)">
+              <button class="btn-abono" data-id="${v.id}">Registrar pago</button>
+            </div>
+            <div class="payment-msg" id="abono-msg-${v.id}" style="display:none"></div>
+          ` : `<div class="venta-pagado-badge">✓ Pagado por completo</div>`}
+        </div>
       `;
       container.appendChild(card);
     });
@@ -483,8 +548,56 @@ async function loadVentas() {
       });
     });
 
+    container.querySelectorAll('.btn-abono').forEach(btn => {
+      btn.addEventListener('click', () => registrarAbono(btn.dataset.id));
+    });
+
   } catch (err) {
     container.innerHTML = `<div class="ventas-empty" style="color:var(--cl-error)">Error: ${err.message}</div>`;
+  }
+}
+
+async function registrarAbono(pedidoId) {
+  const form  = document.querySelector(`.venta-abono-form[data-id="${pedidoId}"]`);
+  const monto = form.querySelector('.abono-monto').value;
+  const metodo = form.querySelector('.abono-metodo').value;
+  const referencia = form.querySelector('.abono-referencia').value.trim();
+  const msgId = `abono-msg-${pedidoId}`;
+
+  if (!monto || parseFloat(monto) <= 0) {
+    showMsg(msgId, 'Ingresa un monto válido.');
+    return;
+  }
+
+  const btn = form.querySelector('.btn-abono');
+  btn.disabled    = true;
+  btn.textContent = 'Registrando...';
+
+  try {
+    const res  = await fetch(`/api/pedidos/${pedidoId}/pagos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        monto:      parseFloat(monto),
+        metodoPago: metodo,
+        referencia: referencia,
+        userId:     currentUser ? currentUser.id : null
+      })
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      showMsg(msgId, data.message);
+      return;
+    }
+
+    loadVentas();
+
+  } catch (err) {
+    showMsg(msgId, 'Error de conexión con el servidor.');
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'Registrar pago';
   }
 }
 

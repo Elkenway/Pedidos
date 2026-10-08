@@ -27,7 +27,6 @@
   </div>
 </nav>
 
-<!-- LOGIN -->
 <div id="login-page" class="page active">
   <div class="login-card">
     <div class="login-header">
@@ -48,7 +47,7 @@
   </div>
 </div>
 
-<!-- TIENDA -->
+
 <div id="store-page" class="page">
   <div class="store-hero">
     <h1>Nuestra Colección</h1>
@@ -83,7 +82,6 @@
   </div>
 </div>
 
-<!-- CHECKOUT (antes "pago", ya sin tarjeta simulada) -->
 <div id="checkout-page" class="page">
   <div class="payment-hero">
     <button class="back-btn" id="btn-back-store">← Volver a la tienda</button>
@@ -130,19 +128,39 @@
       <div class="payment-form-card">
         <h2>Método de pago</h2>
         <div class="field-group">
-          <label>¿Cómo pagó el cliente?</label>
+          <label>Tipo de pago</label>
+          <div class="payment-method-options">
+            <label class="method-option">
+              <input type="radio" name="tipo-pago" value="completo" checked>
+              <span>Pago completo</span>
+            </label>
+            <label class="method-option">
+              <input type="radio" name="tipo-pago" value="parcial">
+              <span>Adelanto</span>
+            </label>
+          </div>
+        </div>
+        <div class="field-group" id="monto-parcial-group" style="display:none">
+          <label>Monto del adelanto</label>
+          <div class="field-wrapper">
+            <input type="number" id="p-monto-parcial" min="0.01" step="0.01" placeholder="0.00">
+          </div>
+          <div class="field-help" id="help-monto-parcial"></div>
+        </div>
+        <div class="field-group">
+          <label>¿Cómo pagó?</label>
           <div class="payment-method-options">
             <label class="method-option">
               <input type="radio" name="metodo-pago" value="efectivo" checked>
-              <span>💵 Efectivo</span>
+              <span>Efectivo</span>
             </label>
             <label class="method-option">
               <input type="radio" name="metodo-pago" value="datafono">
-              <span>💳 Datáfono</span>
+              <span>Datáfono</span>
             </label>
             <label class="method-option">
               <input type="radio" name="metodo-pago" value="transferencia">
-              <span>🏦 Transferencia</span>
+              <span>Transferencia</span>
             </label>
           </div>
         </div>
@@ -161,15 +179,18 @@
       <h2>Resumen del pedido</h2>
       <div id="summary-items"></div>
       <div class="summary-total">
-        <span class="summary-total-label">Total</span>
+        <span class="summary-total-label">Total del pedido</span>
         <span class="summary-total-val">$<span id="summary-total">0</span></span>
+      </div>
+      <div class="summary-pagar-ahora" id="summary-pagar-ahora" style="display:none">
+        <span>Pagas ahora</span>
+        <span id="summary-pagar-ahora-val">$0</span>
       </div>
       <button class="btn-pay" id="btn-confirm-sale">Confirmar venta</button>
     </div>
   </div>
 </div>
 
-<!-- EXITO -->
 <div id="success-page" class="page">
   <div class="success-wrap">
     <div class="success-card">
@@ -183,19 +204,18 @@
       <div class="success-delivery" id="success-delivery"></div>
       <div class="success-detail" id="success-detail"></div>
       <div class="success-actions">
-        <button class="btn-print" id="btn-print-receipt">🖨️ Imprimir comprobante</button>
+        <button class="btn-print" id="btn-print-receipt">Imprimir comprobante</button>
         <button class="btn-new-order" id="btn-new-order">Realizar otro pedido</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- VENTAS (admin) -->
 <div id="ventas-page" class="page">
   <div class="admin-hero">
     <button class="back-btn" id="btn-back-store-ventas">← Volver a tienda</button>
     <h1>Ventas Registradas</h1>
-    <p>Lo que se ha vendido, sin importar quién lo procesó</p>
+    <p>Registro de lo que se ha vendido</p>
   </div>
   <div class="ventas-layout">
     <div class="ventas-summary-bar" id="ventas-summary"></div>
@@ -205,7 +225,6 @@
   </div>
 </div>
 
-<!-- ADMIN -->
 <div id="admin-page" class="page">
   <div class="admin-hero">
     <button class="back-btn" id="btn-back-store-admin">← Volver a tienda</button>
