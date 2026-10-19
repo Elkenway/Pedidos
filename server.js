@@ -50,7 +50,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// ── GET /api/productos ──
 app.get('/api/productos', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -68,7 +67,6 @@ app.get('/api/productos', async (req, res) => {
   }
 });
 
-// ── POST /api/productos  (admin: agregar) ──
 app.post('/api/productos', async (req, res) => {
   const { nombre, precio, cantidad, disponible } = req.body;
   if (!nombre || !nombre.trim())
@@ -92,7 +90,7 @@ app.post('/api/productos', async (req, res) => {
   }
 });
 
-// ── PUT /api/productos/:id  (admin: modificar) ──
+// Modificaciones
 app.put('/api/productos/:id', async (req, res) => {
   const { id } = req.params;
   const { nombre, precio, disponible, cantidad } = req.body;
@@ -117,7 +115,6 @@ app.put('/api/productos/:id', async (req, res) => {
   }
 });
 
-// ── DELETE /api/productos/:id  (admin: eliminar) ──
 app.delete('/api/productos/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -131,12 +128,10 @@ app.delete('/api/productos/:id', async (req, res) => {
   }
 });
 
-// ── POST /api/ventas ──
-// Registra una venta: valida y bloquea stock, descuenta inventario,
-// guarda el pedido con sus datos de entrega y metodo de pago.
-// Ya NO cobra tarjeta — el pago se hace por fuera (datafono/efectivo/transferencia).
+//Registro ventas
+
 app.post('/api/ventas', async (req, res) => {
-  const { amount, items, userId, delivery, metodoPago, referencia } = req.body;
+  const { total, montoPagado, items, userId, delivery, metodoPago, referencia } = req.body;
 
   if (!delivery || !delivery.name || !delivery.address || !delivery.city || !delivery.phone)
     return res.status(400).json({ success: false, message: 'Los datos de entrega están incompletos.' });
@@ -147,15 +142,21 @@ app.post('/api/ventas', async (req, res) => {
   if (!METODOS_VALIDOS.includes(metodoPago))
     return res.status(400).json({ success: false, message: 'Método de pago inválido.' });
 
-  const amountNum = parseFloat(amount);
-  if (isNaN(amountNum) || amountNum <= 0)
+  const totalNum = parseFloat(total);
+  if (isNaN(totalNum) || totalNum <= 0)
     return res.status(400).json({ success: false, message: 'Monto inválido.' });
+
+  const pagadoNum = montoPagado !== undefined ? parseFloat(montoPagado) : totalNum;
+  if (isNaN(pagadoNum) || pagadoNum <= 0)
+    return res.status(400).json({ success: false, message: 'El monto pagado es inválido.' });
+  if (pagadoNum > totalNum + 0.01)
+    return res.status(400).json({ success: false, message: 'El monto pagado no puede ser mayor al total.' });
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Verificar y bloquear stock de cada producto (FOR UPDATE) antes de registrar
+    // Actualizacion productos
     for (const item of items) {
       const prodRes = await client.query(
         'SELECT nombre, cantidad, disponible FROM productos WHERE id = $1 FOR UPDATE',
@@ -174,19 +175,23 @@ app.post('/api/ventas', async (req, res) => {
         });
       }
     }
-
-    // Descontar stock
     for (const item of items) {
       await client.query('UPDATE productos SET cantidad = cantidad - $1 WHERE id = $2', [item.quantity, item.id]);
     }
 
-    // Crear el pedido — numero_pedido lo asigna la secuencia automáticamente
+    // Crear el pedido 
     const pedidoResult = await client.query(
       `INSERT INTO pedidos (usuario_id, nombre_destinatario, direccion, ciudad, telefono, notas, metodo_pago, referencia_pago, total)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, numero_pedido`,
-      [userId || null, delivery.name, delivery.address, delivery.city, delivery.phone, delivery.notes || '', metodoPago, referencia || null, amountNum]
+      [userId || null, delivery.name, delivery.address, delivery.city, delivery.phone, delivery.notes || '', metodoPago, referencia || null, totalNum]
     );
     const pedido = pedidoResult.rows[0];
+
+    await client.query(
+      `INSERT INTO pagos (pedido_id, monto, metodo_pago, referencia_pago, usuario_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [pedido.id, pagadoNum, metodoPago, referencia || null, userId || null]
+    );
 
     for (const item of items) {
       await client.query(
@@ -201,7 +206,8 @@ app.post('/api/ventas', async (req, res) => {
       success: true,
       message: 'Venta registrada con éxito.',
       orderNumber: pedido.numero_pedido,
-      orderId: pedido.id
+      orderId: pedido.id,
+      saldoPendiente: totalNum - pagadoNum
     });
 
   } catch (err) {
@@ -213,9 +219,59 @@ app.post('/api/ventas', async (req, res) => {
   }
 });
 
-// ── GET /api/ventas ──
-// Para el panel de administración: lista todas las ventas
-// (las haga el vendedor o el admin) con quién la hizo y sus items.
+app.post('/api/pedidos/:id/pagos', async (req, res) => {
+  const { id } = req.params;
+  const { monto, metodoPago, referencia, userId } = req.body;
+
+  if (!METODOS_VALIDOS.includes(metodoPago))
+    return res.status(400).json({ success: false, message: 'Método de pago inválido.' });
+
+  const montoNum = parseFloat(monto);
+  if (isNaN(montoNum) || montoNum <= 0)
+    return res.status(400).json({ success: false, message: 'El monto debe ser mayor a cero.' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const pedidoRes = await client.query('SELECT total FROM pedidos WHERE id = $1 FOR UPDATE', [id]);
+    if (pedidoRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'El pedido no existe.' });
+    }
+    const total = parseFloat(pedidoRes.rows[0].total);
+
+    const pagadoRes = await client.query('SELECT COALESCE(SUM(monto), 0) AS pagado FROM pagos WHERE pedido_id = $1', [id]);
+    const pagado = parseFloat(pagadoRes.rows[0].pagado);
+    const saldoPendiente = total - pagado;
+
+    if (montoNum > saldoPendiente + 0.01) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        success: false,
+        message: `El monto supera el saldo pendiente. Saldo actual: $${saldoPendiente.toLocaleString('es-CO')}`
+      });
+    }
+
+    await client.query(
+      `INSERT INTO pagos (pedido_id, monto, metodo_pago, referencia_pago, usuario_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, montoNum, metodoPago, referencia || null, userId || null]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'Pago registrado.', saldoPendiente: saldoPendiente - montoNum });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error POST /api/pedidos/:id/pagos:', err.message);
+    res.status(500).json({ success: false, message: 'Error interno del servidor.' });
+  } finally {
+    client.release();
+  }
+});
+
+// Ver las ventas hechas 
 app.get('/api/ventas', async (req, res) => {
   try {
     const pedidosRes = await pool.query(`
@@ -231,13 +287,34 @@ app.get('/api/ventas', async (req, res) => {
       'SELECT pedido_id, nombre_producto, precio_unitario, cantidad FROM pedido_items ORDER BY id ASC'
     );
 
+    const pagosRes = await pool.query(
+      'SELECT pedido_id, monto, metodo_pago, referencia_pago, fecha_pago FROM pagos ORDER BY fecha_pago ASC'
+    );
+
     const itemsByPedido = {};
     itemsRes.rows.forEach(item => {
       if (!itemsByPedido[item.pedido_id]) itemsByPedido[item.pedido_id] = [];
       itemsByPedido[item.pedido_id].push(item);
     });
 
-    const ventas = pedidosRes.rows.map(p => ({ ...p, items: itemsByPedido[p.id] || [] }));
+    const pagosByPedido = {};
+    pagosRes.rows.forEach(pago => {
+      if (!pagosByPedido[pago.pedido_id]) pagosByPedido[pago.pedido_id] = [];
+      pagosByPedido[pago.pedido_id].push(pago);
+    });
+
+    const ventas = pedidosRes.rows.map(p => {
+      const pagos = pagosByPedido[p.id] || [];
+      const montoPagado = pagos.reduce((s, pg) => s + parseFloat(pg.monto), 0);
+      return {
+        ...p,
+        items: itemsByPedido[p.id] || [],
+        pagos,
+        monto_pagado: montoPagado,
+        saldo_pendiente: parseFloat(p.total) - montoPagado
+      };
+    });
+
     res.json({ success: true, data: ventas });
 
   } catch (err) {
@@ -246,11 +323,7 @@ app.get('/api/ventas', async (req, res) => {
   }
 });
 
-// ── GET /api/ventas/:id/pdf ──
-// Genera el comprobante en PDF de un pedido puntual. No se restringe
-// por rol: lo puede pedir quien acaba de hacer la venta (vendedor o
-// admin, desde la pantalla de éxito) o el admin reimprimiendo desde
-// el panel de Ventas.
+// para los pdfs
 app.get('/api/ventas/:id/pdf', async (req, res) => {
   const { id } = req.params;
   try {
@@ -269,7 +342,20 @@ app.get('/api/ventas/:id/pdf', async (req, res) => {
       [id]
     );
 
-    const venta = { ...pedidoRes.rows[0], items: itemsRes.rows };
+    const pagosRes = await pool.query(
+      'SELECT monto, metodo_pago, referencia_pago, fecha_pago FROM pagos WHERE pedido_id = $1 ORDER BY fecha_pago ASC',
+      [id]
+    );
+
+    const montoPagado = pagosRes.rows.reduce((s, pg) => s + parseFloat(pg.monto), 0);
+
+    const venta = {
+      ...pedidoRes.rows[0],
+      items: itemsRes.rows,
+      pagos: pagosRes.rows,
+      monto_pagado: montoPagado,
+      saldo_pendiente: parseFloat(pedidoRes.rows[0].total) - montoPagado
+    };
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="pedido-${venta.numero_pedido}.pdf"`);

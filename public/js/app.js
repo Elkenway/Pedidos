@@ -70,9 +70,6 @@ function logout() {
   showPage('login');
 }
 
-// ════════════════════════════════════════════
-// LOGIN
-// ════════════════════════════════════════════
 document.getElementById('btn-login').addEventListener('click', doLogin);
 document.getElementById('login-pass').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
@@ -117,9 +114,6 @@ async function doLogin() {
   }
 }
 
-// ════════════════════════════════════════════
-// PRODUCTOS
-// ════════════════════════════════════════════
 let allProducts = [];
 
 async function loadProducts() {
@@ -174,9 +168,6 @@ document.getElementById('search-bar').addEventListener('input', function () {
   renderProducts(q ? allProducts.filter(p => p.nombre.toLowerCase().includes(q)) : allProducts);
 });
 
-// ════════════════════════════════════════════
-// CARRITO — agrupado por producto
-// ════════════════════════════════════════════
 function addToCart(id, name, price, icon) {
   const existing = cart.find(i => i.id === id);
   if (existing) {
@@ -255,9 +246,6 @@ document.getElementById('btn-checkout').addEventListener('click', () => {
   showPage('checkout');
 });
 
-// ════════════════════════════════════════════
-// CHECKOUT 
-// ════════════════════════════════════════════
 document.getElementById('btn-back-store').addEventListener('click', () => showPage('store'));
 
 function renderSummary() {
@@ -276,7 +264,6 @@ function renderSummary() {
   document.getElementById('summary-total').textContent = fmtPrice(total);
 }
 
-// Mostrar el campo de referencia solo si el metodo es transferencia
 document.querySelectorAll('input[name="metodo-pago"]').forEach(radio => {
   radio.addEventListener('change', () => {
     const group = document.getElementById('referencia-group');
@@ -285,7 +272,6 @@ document.querySelectorAll('input[name="metodo-pago"]').forEach(radio => {
   });
 });
 
-// Completo vs adelanto
 document.querySelectorAll('input[name="tipo-pago"]').forEach(radio => {
   radio.addEventListener('change', updateTipoPagoUI);
 });
@@ -442,9 +428,6 @@ document.getElementById('btn-new-order').addEventListener('click', async () => {
   showPage('store');
 });
 
-// ════════════════════════════════════════════
-// VENTAS — panel para el admin
-// ════════════════════════════════════════════
 document.getElementById('btn-back-store-ventas').addEventListener('click', async () => {
   await loadProducts();
   showPage('store');
@@ -601,9 +584,6 @@ async function registrarAbono(pedidoId) {
   }
 }
 
-// ════════════════════════════════════════════
-// ADMIN — CRUD completo de productos
-// ════════════════════════════════════════════
 document.getElementById('btn-back-store-admin').addEventListener('click', async () => {
   await loadProducts();
   showPage('store');
@@ -777,9 +757,6 @@ async function addNewProduct() {
   }
 }
 
-// ════════════════════════════════════════════
-// INIT — restaurar sesión al recargar la página
-// ════════════════════════════════════════════
 (async () => {
   renderCart();
   const saved = localStorage.getItem('cl_session');
