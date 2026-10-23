@@ -1,3 +1,4 @@
+
 let currentUser = null;
 let cart = [];
 
@@ -7,20 +8,14 @@ function showPage(id) {
 }
 function fmtPrice(n) { return Number(n).toLocaleString('es-CO'); }
 
-function getIcon(nombre) {
-  const n = nombre.toLowerCase();
-  if (n.includes('silla'))          return '🪑';
-  if (n.includes('comedor'))        return '🍽️';
-  if (n.includes('mesa de centro')) return '☕';
-  if (n.includes('jard'))           return '🌿';
-  if (n.includes('mesa alta'))      return '🍺';
-  if (n.includes('mesa'))           return '🪵';
-  if (n.includes('cama'))           return '🛏️';
-  if (n.includes('sofacama'))       return '🛌';
-  if (n.includes('sof'))            return '🛋️';
-  if (n.includes('esquinero'))      return '🪞';
-  if (n.includes('accesorio'))      return '🖼️';
-  return '📦';
+function escapeHtml(valor) {
+  return String(valor).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function productImgHtml(url, alt, cssClass) {
+  return url ? `<img class="${cssClass}" src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" loading="lazy">` : '';
 }
 
 function showMsg(elementId, msg, type = 'error') {
@@ -36,7 +31,6 @@ function hideMsg(elementId) {
   if (el) el.style.display = 'none';
 }
 
-// ── NAV ──
 document.getElementById('btn-logout').addEventListener('click', logout);
 document.getElementById('btn-go-store').addEventListener('click', async () => {
   await loadProducts();
@@ -140,25 +134,24 @@ function renderProducts(products) {
   }
   products.forEach(p => {
     const enStock = p.disponible && parseInt(p.cantidad) > 0;
-    const icon    = getIcon(p.nombre);
     const card    = document.createElement('div');
     card.className = 'product-card' + (enStock ? '' : ' unavailable');
     card.innerHTML = `
-      <div class="product-icon">${icon}</div>
-      <div class="product-name">${p.nombre}</div>
+      ${productImgHtml(p.imagen_url, p.nombre, 'product-img')}
+      <div class="product-name">${escapeHtml(p.nombre)}</div>
       <div class="product-price">$${fmtPrice(p.precio)} <span>USD</span></div>
       <span class="product-badge ${enStock ? 'badge-available' : 'badge-unavailable'}">
         ${enStock ? `Disponible (${p.cantidad})` : 'Sin stock'}
       </span>
       ${enStock
-        ? `<button class="btn-add" data-id="${p.id}" data-name="${p.nombre}" data-price="${p.precio}" data-icon="${icon}">+ Agregar</button>`
+        ? `<button class="btn-add" data-id="${p.id}" data-name="${escapeHtml(p.nombre)}" data-price="${p.precio}">+ Agregar</button>`
         : ''}
     `;
     grid.appendChild(card);
   });
   grid.querySelectorAll('.btn-add').forEach(btn => {
     btn.addEventListener('click', () => {
-      addToCart(btn.dataset.id, btn.dataset.name, parseFloat(btn.dataset.price), btn.dataset.icon);
+      addToCart(btn.dataset.id, btn.dataset.name, parseFloat(btn.dataset.price));
     });
   });
 }
@@ -168,12 +161,17 @@ document.getElementById('search-bar').addEventListener('input', function () {
   renderProducts(q ? allProducts.filter(p => p.nombre.toLowerCase().includes(q)) : allProducts);
 });
 
-function addToCart(id, name, price, icon) {
+//si la imagen no sube, muestra solo el nombre y no una imagen rota
+document.getElementById('products-grid').addEventListener('error', e => {
+  if (e.target.matches('.product-img')) e.target.remove();
+}, true);
+
+function addToCart(id, name, price) {
   const existing = cart.find(i => i.id === id);
   if (existing) {
     existing.quantity += 1;
   } else {
-    cart.push({ id, name, price, icon, quantity: 1 });
+    cart.push({ id, name, price, quantity: 1 });
   }
   renderCart();
 }
@@ -201,7 +199,7 @@ function renderCart() {
     d.className = 'cart-item';
     d.innerHTML = `
       <div class="cart-item-info">
-        <span class="cart-item-name">${item.icon} ${item.name}</span>
+        <span class="cart-item-name">${escapeHtml(item.name)}</span>
         <span class="cart-item-unit">$${fmtPrice(item.price)} c/u</span>
       </div>
       <div class="cart-item-controls">
@@ -240,9 +238,6 @@ document.getElementById('btn-checkout').addEventListener('click', () => {
   if (cart.length === 0) return;
   renderSummary();
   hideMsg('checkout-msg');
-  document.querySelector('input[name="tipo-pago"][value="completo"]').checked = true;
-  document.getElementById('monto-parcial-group').style.display = 'none';
-  document.getElementById('summary-pagar-ahora').style.display = 'none';
   showPage('checkout');
 });
 
@@ -256,7 +251,7 @@ function renderSummary() {
     const d = document.createElement('div');
     d.className = 'summary-item';
     d.innerHTML = `
-      <span class="item-name">${item.icon} ${item.name}${item.quantity > 1 ? ` <small>×${item.quantity}</small>` : ''}</span>
+      <span class="item-name">${escapeHtml(item.name)}${item.quantity > 1 ? ` <small>×${item.quantity}</small>` : ''}</span>
       <span class="item-price">$${fmtPrice(item.price * item.quantity)}</span>
     `;
     el.appendChild(d);
@@ -264,6 +259,7 @@ function renderSummary() {
   document.getElementById('summary-total').textContent = fmtPrice(total);
 }
 
+// Mostrar el campo de referencia solo si el metodo es transferencia
 document.querySelectorAll('input[name="metodo-pago"]').forEach(radio => {
   radio.addEventListener('change', () => {
     const group = document.getElementById('referencia-group');
@@ -271,25 +267,6 @@ document.querySelectorAll('input[name="metodo-pago"]').forEach(radio => {
     group.style.display = (selected === 'transferencia') ? 'block' : 'none';
   });
 });
-
-document.querySelectorAll('input[name="tipo-pago"]').forEach(radio => {
-  radio.addEventListener('change', updateTipoPagoUI);
-});
-document.getElementById('p-monto-parcial').addEventListener('input', updateResumenPago);
-
-function updateTipoPagoUI() {
-  const tipo = document.querySelector('input[name="tipo-pago"]:checked').value;
-  document.getElementById('monto-parcial-group').style.display   = (tipo === 'parcial') ? 'block' : 'none';
-  document.getElementById('summary-pagar-ahora').style.display   = (tipo === 'parcial') ? 'flex'  : 'none';
-  updateResumenPago();
-}
-
-function updateResumenPago() {
-  const tipo = document.querySelector('input[name="tipo-pago"]:checked').value;
-  if (tipo !== 'parcial') return;
-  const monto = parseFloat(document.getElementById('p-monto-parcial').value) || 0;
-  document.getElementById('summary-pagar-ahora-val').textContent = '$' + fmtPrice(monto);
-}
 
 document.getElementById('btn-confirm-sale').addEventListener('click', confirmSale);
 
@@ -301,7 +278,6 @@ async function confirmSale() {
   const deliveryCity    = document.getElementById('d-city').value.trim();
   const deliveryPhone   = document.getElementById('d-phone').value.trim();
   const deliveryNotes   = document.getElementById('d-notes').value.trim();
-  const tipoPago        = document.querySelector('input[name="tipo-pago"]:checked').value;
   const metodoPago      = document.querySelector('input[name="metodo-pago"]:checked').value;
   const referencia      = document.getElementById('p-referencia').value.trim();
   const total           = cart.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -310,19 +286,6 @@ async function confirmSale() {
   if (!deliveryAddress) { showMsg('checkout-msg', 'Ingresa la dirección de entrega.'); return; }
   if (!deliveryCity)    { showMsg('checkout-msg', 'Ingresa la ciudad.'); return; }
   if (!deliveryPhone)   { showMsg('checkout-msg', 'Ingresa el teléfono de contacto.'); return; }
-
-  let montoPagado = total;
-  if (tipoPago === 'parcial') {
-    montoPagado = parseFloat(document.getElementById('p-monto-parcial').value);
-    if (isNaN(montoPagado) || montoPagado <= 0) {
-      showMsg('checkout-msg', 'Ingresa el monto del adelanto.');
-      return;
-    }
-    if (montoPagado >= total) {
-      showMsg('checkout-msg', 'El adelanto debe ser menor al total. Si va a pagar todo, selecciona "Pago completo".');
-      return;
-    }
-  }
 
   const btn = document.getElementById('btn-confirm-sale');
   btn.disabled    = true;
@@ -333,12 +296,11 @@ async function confirmSale() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        total:       total,
-        montoPagado: montoPagado,
-        userId:      currentUser ? currentUser.id : null,
-        metodoPago:  metodoPago,
-        referencia:  referencia,
-        items:       cart.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
+        amount:     total,
+        userId:     currentUser ? currentUser.id : null,
+        metodoPago: metodoPago,
+        referencia: referencia,
+        items:      cart.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity })),
         delivery: {
           name:    deliveryName,
           address: deliveryAddress,
@@ -357,7 +319,7 @@ async function confirmSale() {
 
     document.getElementById('success-order-num').textContent = '#' + data.orderNumber;
     buildSuccessDelivery({ name: deliveryName, address: deliveryAddress, city: deliveryCity, phone: deliveryPhone, notes: deliveryNotes });
-    buildSuccessDetail(total, montoPagado, data.saldoPendiente);
+    buildSuccessDetail(total);
     document.getElementById('btn-print-receipt').onclick = () => {
       window.open(`/api/ventas/${data.orderId}/pdf`, '_blank');
     };
@@ -384,13 +346,13 @@ function buildSuccessDelivery(d) {
   `;
 }
 
-function buildSuccessDetail(total, montoPagado, saldoPendiente) {
+function buildSuccessDetail(total) {
   const el = document.getElementById('success-detail');
   el.innerHTML = '';
   cart.forEach(item => {
     const r = document.createElement('div');
     r.className = 'detail-row';
-    r.innerHTML = `<span>${item.icon} ${item.name}${item.quantity > 1 ? ` ×${item.quantity}` : ''}</span><span>$${fmtPrice(item.price * item.quantity)}</span>`;
+    r.innerHTML = `<span>${escapeHtml(item.name)}${item.quantity > 1 ? ` ×${item.quantity}` : ''}</span><span>$${fmtPrice(item.price * item.quantity)}</span>`;
     el.appendChild(r);
   });
   const tot = document.createElement('div');
@@ -398,32 +360,17 @@ function buildSuccessDetail(total, montoPagado, saldoPendiente) {
   tot.style.cssText = 'border-top:2px solid var(--cl-warm);margin-top:4px;padding-top:8px;';
   tot.innerHTML = `<span><b>Total</b></span><span>$${fmtPrice(total)}</span>`;
   el.appendChild(tot);
-
-  if (saldoPendiente > 0.01) {
-    const pagadoRow = document.createElement('div');
-    pagadoRow.className = 'detail-row';
-    pagadoRow.innerHTML = `<span>Pagado ahora</span><span>$${fmtPrice(montoPagado)}</span>`;
-    el.appendChild(pagadoRow);
-
-    const saldoRow = document.createElement('div');
-    saldoRow.className = 'detail-row saldo-row';
-    saldoRow.innerHTML = `<span><b>Saldo pendiente</b></span><span><b>$${fmtPrice(saldoPendiente)}</b></span>`;
-    el.appendChild(saldoRow);
-  }
 }
 
 document.getElementById('btn-new-order').addEventListener('click', async () => {
   cart = [];
   renderCart();
-  ['d-name','d-address','d-city','d-phone','d-notes','p-referencia','p-monto-parcial'].forEach(id => {
+  ['d-name','d-address','d-city','d-phone','d-notes','p-referencia'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
   document.querySelector('input[name="metodo-pago"][value="efectivo"]').checked = true;
-  document.querySelector('input[name="tipo-pago"][value="completo"]').checked = true;
   document.getElementById('referencia-group').style.display = 'none';
-  document.getElementById('monto-parcial-group').style.display = 'none';
-  document.getElementById('summary-pagar-ahora').style.display = 'none';
   await loadProducts();
   showPage('store');
 });
@@ -451,13 +398,11 @@ async function loadVentas() {
     if (!data.success) throw new Error(data.message);
 
     const ventas = data.data;
-    const totalVendido  = ventas.reduce((s, v) => s + parseFloat(v.total), 0);
-    const totalPorCobrar = ventas.reduce((s, v) => s + parseFloat(v.saldo_pendiente), 0);
+    const totalVendido = ventas.reduce((s, v) => s + parseFloat(v.total), 0);
 
     summaryBar.innerHTML = `
       <div><span class="vs-label">Ventas registradas</span><br><span class="vs-value">${ventas.length}</span></div>
       <div><span class="vs-label">Total vendido</span><br><span class="vs-value">$${fmtPrice(totalVendido)}</span></div>
-      ${totalPorCobrar > 0.01 ? `<div><span class="vs-label">Por cobrar</span><br><span class="vs-value vs-value-alert">$${fmtPrice(totalPorCobrar)}</span></div>` : ''}
     `;
 
     if (ventas.length === 0) {
@@ -498,29 +443,12 @@ async function loadVentas() {
         <div class="venta-items">
           ${v.items.map(it => `
             <div class="venta-item-row">
-              <span>${getIcon(it.nombre_producto)} ${it.nombre_producto} ×${it.cantidad}</span>
+              <span>${escapeHtml(it.nombre_producto)} ×${it.cantidad}</span>
               <span>$${fmtPrice(it.precio_unitario * it.cantidad)}</span>
             </div>
           `).join('')}
         </div>
-        <div class="venta-pago">
-          <div class="venta-pago-row"><span>Total</span><span>$${fmtPrice(v.total)}</span></div>
-          <div class="venta-pago-row pagado"><span>Pagado</span><span>$${fmtPrice(v.monto_pagado)}</span></div>
-          ${v.saldo_pendiente > 0.01 ? `
-            <div class="venta-pago-row saldo"><span>Saldo pendiente</span><span>$${fmtPrice(v.saldo_pendiente)}</span></div>
-            <div class="venta-abono-form" data-id="${v.id}">
-              <input type="number" class="abono-monto" placeholder="Monto" min="0.01" step="0.01" max="${v.saldo_pendiente}">
-              <select class="abono-metodo">
-                <option value="efectivo">Efectivo</option>
-                <option value="datafono">Datáfono</option>
-                <option value="transferencia">Transferencia</option>
-              </select>
-              <input type="text" class="abono-referencia" placeholder="Referencia (opcional)">
-              <button class="btn-abono" data-id="${v.id}">Registrar pago</button>
-            </div>
-            <div class="payment-msg" id="abono-msg-${v.id}" style="display:none"></div>
-          ` : `<div class="venta-pagado-badge">✓ Pagado por completo</div>`}
-        </div>
+        <div class="venta-total-row"><span>Total</span><span>$${fmtPrice(v.total)}</span></div>
       `;
       container.appendChild(card);
     });
@@ -531,56 +459,8 @@ async function loadVentas() {
       });
     });
 
-    container.querySelectorAll('.btn-abono').forEach(btn => {
-      btn.addEventListener('click', () => registrarAbono(btn.dataset.id));
-    });
-
   } catch (err) {
     container.innerHTML = `<div class="ventas-empty" style="color:var(--cl-error)">Error: ${err.message}</div>`;
-  }
-}
-
-async function registrarAbono(pedidoId) {
-  const form  = document.querySelector(`.venta-abono-form[data-id="${pedidoId}"]`);
-  const monto = form.querySelector('.abono-monto').value;
-  const metodo = form.querySelector('.abono-metodo').value;
-  const referencia = form.querySelector('.abono-referencia').value.trim();
-  const msgId = `abono-msg-${pedidoId}`;
-
-  if (!monto || parseFloat(monto) <= 0) {
-    showMsg(msgId, 'Ingresa un monto válido.');
-    return;
-  }
-
-  const btn = form.querySelector('.btn-abono');
-  btn.disabled    = true;
-  btn.textContent = 'Registrando...';
-
-  try {
-    const res  = await fetch(`/api/pedidos/${pedidoId}/pagos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        monto:      parseFloat(monto),
-        metodoPago: metodo,
-        referencia: referencia,
-        userId:     currentUser ? currentUser.id : null
-      })
-    });
-    const data = await res.json();
-
-    if (!data.success) {
-      showMsg(msgId, data.message);
-      return;
-    }
-
-    loadVentas();
-
-  } catch (err) {
-    showMsg(msgId, 'Error de conexión con el servidor.');
-  } finally {
-    btn.disabled    = false;
-    btn.textContent = 'Registrar pago';
   }
 }
 
@@ -591,7 +471,7 @@ document.getElementById('btn-back-store-admin').addEventListener('click', async 
 
 async function loadAdminProducts() {
   const tbody = document.getElementById('admin-tbody');
-  tbody.innerHTML = '<tr><td colspan="5" class="loading-products">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" class="loading-products">Cargando...</td></tr>';
   try {
     const res  = await fetch('/api/productos');
     const data = await res.json();
@@ -601,7 +481,16 @@ async function loadAdminProducts() {
     data.data.forEach(p => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="td-name">${getIcon(p.nombre)} <input type="text" class="admin-input-full" value="${p.nombre}" data-field="nombre"></td>
+        <td class="td-name"><input type="text" class="admin-input-full" value="${escapeHtml(p.nombre)}" data-field="nombre"></td>
+        <td>
+          <div class="admin-foto">
+            ${productImgHtml(p.imagen_url, p.nombre, 'admin-thumb')}
+            <label class="btn-foto" title="Elegir la foto del producto: JPG, PNG o WEBP, hasta 5 MB">
+              <span>${p.imagen_url ? 'Cambiar' : 'Subir'}</span>
+              <input type="file" accept="image/jpeg,image/png,image/webp" data-id="${p.id}">
+            </label>
+          </div>
+        </td>
         <td><input type="number" class="admin-input" value="${p.precio}" min="0" step="0.01" data-field="precio"></td>
         <td><input type="number" class="admin-input" value="${p.cantidad}" min="0" step="1" data-field="cantidad"></td>
         <td class="td-center">
@@ -626,9 +515,12 @@ async function loadAdminProducts() {
     tbody.querySelectorAll('.btn-delete-row').forEach(btn => {
       btn.addEventListener('click', () => confirmDeleteProduct(btn));
     });
+    tbody.querySelectorAll('.btn-foto input').forEach(input => {
+      input.addEventListener('change', () => changeProductImage(input));
+    });
 
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--cl-error);padding:1rem">Error: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--cl-error);padding:1rem">Error: ${err.message}</td></tr>`;
   }
 }
 
@@ -716,6 +608,42 @@ async function deleteProduct(id, btn) {
   }
 }
 
+async function sendProductImage(id, file) {
+  const form = new FormData();
+  form.append('imagen', file);
+  const res  = await fetch(`/api/productos/${id}/imagen`, { method: 'PUT', body: form });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message);
+  return data.imagen_url;
+}
+
+// Sube la foto elegida en una fila y actualiza solo esa fila 
+async function changeProductImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const row   = input.closest('tr');
+  const wrap  = row.querySelector('.admin-foto');
+  const label = wrap.querySelector('.btn-foto span');
+
+  label.textContent = 'Subiendo...';
+  try {
+    const url   = await sendProductImage(input.dataset.id, file);
+    const vieja = wrap.querySelector('.admin-thumb');
+    if (vieja) vieja.remove();
+    wrap.insertAdjacentHTML('afterbegin',
+      productImgHtml(url, row.querySelector('[data-field="nombre"]').value, 'admin-thumb'));
+    label.textContent = 'Cambiar';
+  } catch (err) {
+    label.textContent = err.message || 'Error';
+    setTimeout(() => {
+      label.textContent = wrap.querySelector('.admin-thumb') ? 'Cambiar' : 'Subir';
+    }, 2500);
+  } finally {
+    input.value = '';
+  }
+}
+
 document.getElementById('btn-add-product').addEventListener('click', addNewProduct);
 
 async function addNewProduct() {
@@ -723,6 +651,7 @@ async function addNewProduct() {
   const precio     = document.getElementById('new-price').value;
   const cantidad   = document.getElementById('new-stock').value;
   const disponible = document.getElementById('new-disponible').checked;
+  const foto       = document.getElementById('new-image').files[0];   // opcional
 
   if (!nombre)                                   { showMsg('add-product-msg', 'El nombre es obligatorio.'); return; }
   if (!precio || parseFloat(precio) < 0)         { showMsg('add-product-msg', 'Ingresa un precio válido.'); return; }
@@ -741,11 +670,21 @@ async function addNewProduct() {
     const data = await res.json();
     if (!data.success) throw new Error(data.message);
 
-    showMsg('add-product-msg', 'Producto agregado correctamente.', 'success');
+    let aviso = 'Producto agregado correctamente.', tipo = 'success';
+    if (foto) {
+      try {
+        await sendProductImage(data.id, foto);
+      } catch (err) {
+        aviso = `Producto agregado, pero la foto no se subió (${err.message.replace(/\.$/, '')}). Puedes subirla desde la tabla.`;
+        tipo  = 'error';
+      }
+    }
+    showMsg('add-product-msg', aviso, tipo);
     document.getElementById('new-name').value  = '';
     document.getElementById('new-price').value = '';
     document.getElementById('new-stock').value = '';
     document.getElementById('new-disponible').checked = true;
+    document.getElementById('new-image').value = '';
 
     loadAdminProducts();
 

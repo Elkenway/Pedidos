@@ -1,5 +1,3 @@
-// sistema de generacion de pdf's
-
 const PDFDocument = require('pdfkit');
 
 const COLOR_DARK  = '#1a1a18';
@@ -36,7 +34,6 @@ function generarPdfPedido(venta, stream) {
   const marginX = 50;
   const contentWidth = doc.page.width - marginX * 2;
 
-  // ── Encabezado con marca ──
   doc.rect(0, 0, doc.page.width, 90).fill(COLOR_DARK);
   doc.rect(marginX, 22, 30, 30).fill(COLOR_WARM);
   doc.fillColor(COLOR_DARK).fontSize(12).font('Helvetica-Bold').text('CL', marginX + 7, 30);

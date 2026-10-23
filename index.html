@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Castano Living</title>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">CL</div>
+    <div>
+      <div class="nav-title">Muebles Castaño</div>
+      <div class="nav-subtitle">Indoor · Outdoor Furniture</div>
+    </div>
+  </div>
+  <div class="nav-user" id="nav-user">
+    <div class="nav-links">
+      <button class="btn-nav" id="btn-go-store">Tienda</button>
+      <button class="btn-nav btn-nav-admin" id="btn-go-ventas">Ventas</button>
+      <button class="btn-nav btn-nav-admin" id="btn-go-admin">Admin</button>
+    </div>
+    Hola, <span id="nav-username"></span>
+    <button class="btn-logout" id="btn-logout">Salir</button>
+  </div>
+</nav>
+
+<div id="login-page" class="page active">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="logo-big">CL</div>
+      <h1>Muebles Castaño</h1>
+      <p>Accede a tu cuenta</p>
+    </div>
+    <div class="form-group">
+      <label>Usuario</label>
+      <input type="text" id="login-user" placeholder="nombre de usuario" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-primary" id="btn-login">Ingresar</button>
+    <div id="login-error" class="msg-error"></div>
+  </div>
+</div>
+
+<div id="store-page" class="page">
+  <div class="store-hero">
+    <h1>Nuestra Colección</h1>
+    <p>Selecciona los productos y finaliza tu pedido</p>
+  </div>
+  <div class="store-layout">
+    <div class="store-left">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-bar" placeholder="Buscar producto...">
+      </div>
+      <div class="products-grid" id="products-grid">
+        <div class="loading-products">Cargando productos...</div>
+      </div>
+    </div>
+    <div class="cart-panel">
+      <div class="cart-title">
+        Carrito
+        <div class="cart-badge" id="cart-count">0</div>
+      </div>
+      <div class="cart-items" id="cart-items">
+        <p class="cart-empty">Tu carrito está vacío</p>
+      </div>
+      <div class="cart-total">
+        <span class="cart-total-label">Total</span>
+        <span class="cart-total-value"><span>$</span><span id="cart-total">0</span></span>
+      </div>
+      <button class="btn-checkout" id="btn-checkout" disabled>
+        Continuar pedido →
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="checkout-page" class="page">
+  <div class="payment-hero">
+    <button class="back-btn" id="btn-back-store">← Volver a la tienda</button>
+    <h1>Confirmar Pedido</h1>
+    <p>Completa los datos de entrega y el pago</p>
+  </div>
+  <div class="payment-layout">
+    <div>
+
+      <div class="payment-form-card" style="margin-bottom:1rem">
+        <h2>Datos de entrega</h2>
+        <div class="field-group">
+          <label>Nombre completo del destinatario</label>
+          <div class="field-wrapper">
+            <input type="text" id="d-name" placeholder="Nombre y apellidos">
+          </div>
+        </div>
+        <div class="field-group">
+          <label>Dirección de entrega</label>
+          <div class="field-wrapper">
+            <input type="text" id="d-address" placeholder="Calle, carrera, barrio...">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field-group">
+            <label>Ciudad</label>
+            <div class="field-wrapper">
+              <input type="text" id="d-city" placeholder="Ciudad">
+            </div>
+          </div>
+          <div class="field-group">
+            <label>Teléfono</label>
+            <div class="field-wrapper">
+              <input type="text" id="d-phone" placeholder="Número de contacto">
+            </div>
+          </div>
+        </div>
+        <div class="field-group">
+          <label>Notas adicionales (opcional)</label>
+          <textarea id="d-notes" class="field-textarea" placeholder="Instrucciones de entrega, referencias..." rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="payment-form-card">
+        <h2>Método de pago</h2>
+        <div class="field-group">
+          <label>¿Cómo pagó el cliente?</label>
+          <div class="payment-method-options">
+            <label class="method-option">
+              <input type="radio" name="metodo-pago" value="efectivo" checked>
+              <span>Efectivo</span>
+            </label>
+            <label class="method-option">
+              <input type="radio" name="metodo-pago" value="datafono">
+              <span>Datáfono</span>
+            </label>
+            <label class="method-option">
+              <input type="radio" name="metodo-pago" value="transferencia">
+              <span>Transferencia</span>
+            </label>
+          </div>
+        </div>
+        <div class="field-group" id="referencia-group" style="display:none">
+          <label>Número de referencia / comprobante (opcional)</label>
+          <div class="field-wrapper">
+            <input type="text" id="p-referencia" placeholder="ej. transacción #12345">
+          </div>
+        </div>
+      </div>
+
+      <div id="checkout-msg" class="payment-msg" style="display:none"></div>
+    </div>
+
+    <div class="order-summary-card">
+      <h2>Resumen del pedido</h2>
+      <div id="summary-items"></div>
+      <div class="summary-total">
+        <span class="summary-total-label">Total</span>
+        <span class="summary-total-val">$<span id="summary-total">0</span></span>
+      </div>
+      <button class="btn-pay" id="btn-confirm-sale">Confirmar venta</button>
+    </div>
+  </div>
+</div>
+
+<div id="success-page" class="page">
+  <div class="success-wrap">
+    <div class="success-card">
+      <div class="success-icon">✓</div>
+      <h2>¡Venta registrada!</h2>
+      <p>El pedido ha sido registrado correctamente.</p>
+      <div class="success-order">
+        <div class="order-label">Número de pedido</div>
+        <div class="order-num" id="success-order-num">#000000</div>
+      </div>
+      <div class="success-delivery" id="success-delivery"></div>
+      <div class="success-detail" id="success-detail"></div>
+      <div class="success-actions">
+        <button class="btn-print" id="btn-print-receipt">Imprimir comprobante</button>
+        <button class="btn-new-order" id="btn-new-order">Realizar otro pedido</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="ventas-page" class="page">
+  <div class="admin-hero">
+    <button class="back-btn" id="btn-back-store-ventas">← Volver a tienda</button>
+    <h1>Ventas Registradas</h1>
+    <p>Lo que se ha vendido, sin importar quién lo procesó</p>
+  </div>
+  <div class="ventas-layout">
+    <div class="ventas-summary-bar" id="ventas-summary"></div>
+    <div class="ventas-list" id="ventas-list">
+      <div class="loading-products">Cargando ventas...</div>
+    </div>
+  </div>
+</div>
+
+<div id="admin-page" class="page">
+  <div class="admin-hero">
+    <button class="back-btn" id="btn-back-store-admin">← Volver a tienda</button>
+    <h1>Panel de Administración</h1>
+    <p>Gestiona precios, stock y disponibilidad</p>
+  </div>
+  <div class="admin-layout">
+
+    <div class="admin-card" style="margin-bottom:1.5rem">
+      <div class="admin-card-header">
+        <h2>Agregar nuevo producto</h2>
+      </div>
+      <div class="admin-add-body">
+        <div class="admin-add-grid">
+          <div class="field-group">
+            <label>Nombre del producto</label>
+            <input type="text" class="admin-input-full" id="new-name" placeholder="ej. Comedor 6 puestos Roble">
+          </div>
+          <div class="field-group">
+            <label>Precio (USD)</label>
+            <input type="number" class="admin-input" id="new-price" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="field-group">
+            <label>Cantidad</label>
+            <input type="number" class="admin-input" id="new-stock" min="0" placeholder="0">
+          </div>
+          <div class="field-group">
+            <label>Disponible</label>
+            <label class="toggle" style="margin-top:8px">
+              <input type="checkbox" id="new-disponible" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="new-image">Foto (opcional)</label>
+          <input type="file" id="new-image" class="admin-file" accept="image/jpeg,image/png,image/webp">
+          <span class="admin-hint">JPG, PNG o WEBP, hasta 5 MB</span>
+        </div>
+        <button class="btn-add-product" id="btn-add-product">+ Agregar producto</button>
+        <div id="add-product-msg" class="payment-msg" style="display:none;margin-top:10px"></div>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-card-header">
+        <h2>Productos existentes</h2>
+        <span class="admin-hint">Edita los campos y presiona Guardar en cada fila. La foto se sube apenas la eliges.</span>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Foto</th>
+              <th>Precio</th>
+              <th>Stock</th>
+              <th>Disponible</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="admin-tbody">
+            <tr><td colspan="6" class="loading-products">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
